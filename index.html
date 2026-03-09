@@ -50,7 +50,7 @@
     }
 
     /* ── Chess board grid ── */
-    #board {
+    .board-grid {
       display: grid;
       grid-template-columns: repeat(8, 70px);
       grid-template-rows: repeat(8, 70px);
@@ -80,24 +80,6 @@
       border: 6px solid rgba(0,0,0,0.18);
       border-radius: 50%;
       pointer-events: none;
-    }
-
-    /* Assessment badge on board square */
-    .sq .assess-badge {
-      position: absolute; top: -6px; right: -6px;
-      width: 24px; height: 24px;
-      border-radius: 50%; z-index: 10;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 900;
-      color: #fff;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-      pointer-events: none;
-      animation: badgePop 0.3s ease-out;
-    }
-    @keyframes badgePop {
-      0% { transform: scale(0); }
-      60% { transform: scale(1.3); }
-      100% { transform: scale(1); }
     }
 
     /* ── Pieces ── */
@@ -161,17 +143,9 @@
 
     /* ── ELO Slider ── */
     .elo-container { display: flex; flex-direction: column; gap: 10px; }
-
-    .elo-header {
-      display: flex; justify-content: space-between; align-items: baseline;
-    }
-    .elo-value {
-      font-size: 28px; font-weight: 800; color: #4ecca3;
-      font-variant-numeric: tabular-nums;
-    }
-    .elo-label {
-      font-size: 12px; color: #7a8899; font-weight: 600;
-    }
+    .elo-header { display: flex; justify-content: space-between; align-items: baseline; }
+    .elo-value { font-size: 28px; font-weight: 800; color: #4ecca3; font-variant-numeric: tabular-nums; }
+    .elo-label { font-size: 12px; color: #7a8899; font-weight: 600; }
 
     input[type="range"] {
       -webkit-appearance: none; appearance: none;
@@ -204,9 +178,23 @@
     .preset-btn:hover { border-color: #4ecca3; color: #ccc; }
     .preset-btn.active { border-color: #4ecca3; background: #1a4a3a; color: #4ecca3; }
 
-    /* New Game button */
+    /* ── Live Opening Display ── */
+    .opening-display {
+      display: none; flex-direction: column; gap: 4px;
+    }
+    .opening-display.visible { display: flex; }
+    .opening-name {
+      font-size: 16px; font-weight: 800; color: #e0e0e0;
+    }
+    .opening-eco {
+      font-size: 10px; color: #4ecca3; font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    /* ── Buttons ── */
+    .game-buttons { display: flex; gap: 8px; }
     #btn-new {
-      width: 100%; background: #0f3460;
+      flex: 1; background: #0f3460;
       border: 2px solid #4ecca3; color: #4ecca3;
       padding: 11px; border-radius: 7px;
       cursor: pointer; font-size: 14px; font-weight: bold;
@@ -214,21 +202,15 @@
     }
     #btn-new:hover { background: #1a4a3a; }
 
-    /* ── Assessment Card ── */
-    .assess-container {
-      display: flex; align-items: center; gap: 12px;
-      padding: 8px 0;
+    #btn-review {
+      flex: 1; background: #0f3460;
+      border: 2px solid #e6b920; color: #e6b920;
+      padding: 11px; border-radius: 7px;
+      cursor: pointer; font-size: 14px; font-weight: bold;
+      letter-spacing: 0.5px; transition: background 0.15s;
+      display: none;
     }
-    .assess-icon {
-      width: 36px; height: 36px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px; font-weight: 900; color: #fff;
-      flex-shrink: 0;
-    }
-    .assess-info { display: flex; flex-direction: column; gap: 2px; }
-    .assess-name { font-size: 14px; font-weight: 700; }
-    .assess-detail { font-size: 11px; color: #667; }
-    .assess-waiting { color: #556; font-size: 12px; font-style: italic; }
+    #btn-review:hover { background: #3a3520; }
 
     /* ── Move history ── */
     .history-scroll {
@@ -238,7 +220,7 @@
     .history-scroll::-webkit-scrollbar-thumb { background: #1a3a5c; border-radius: 2px; }
 
     .move-row {
-      display: grid; grid-template-columns: 24px 1fr 1fr;
+      display: grid; grid-template-columns: 28px 1fr 1fr;
       gap: 4px; padding: 3px 0;
       border-bottom: 1px solid #0f1a2e; color: #7a8899;
     }
@@ -270,6 +252,234 @@
       transition: all 0.15s;
     }
     .promo-sq:hover { border-color: #4ecca3; background: #1a4a3a; }
+
+    /* ══════════════════════════════════════════
+       REVIEW OVERLAY
+       ══════════════════════════════════════════ */
+    #review-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      background: #1a1a2e;
+      overflow-y: auto;
+      display: none;
+    }
+    .review-layout {
+      display: flex; gap: 30px; padding: 30px;
+      max-width: 1200px; width: 100%; margin: 0 auto;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    /* Left side: eval bar + board + nav */
+    .review-left {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 14px; flex-shrink: 0;
+    }
+    .review-board-row {
+      display: flex; gap: 0; align-items: stretch;
+    }
+
+    /* Eval bar */
+    .review-eval-bar {
+      width: 26px; border-radius: 4px 0 0 4px;
+      background: #333; position: relative; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .rev-eval-black {
+      background: #333; transition: flex 0.5s ease;
+      flex: 1;
+    }
+    .rev-eval-white {
+      background: #e8e8e8; transition: flex 0.5s ease;
+      flex: 1;
+    }
+    .rev-eval-label {
+      position: absolute; left: 50%; top: 50%;
+      transform: translate(-50%, -50%) rotate(-90deg);
+      font-size: 11px; font-weight: 800; color: #888;
+      white-space: nowrap; pointer-events: none;
+    }
+
+    .review-frame {
+      background: #4a5240;
+      padding: 0; border-radius: 0 4px 4px 0;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+    }
+
+    /* Nav bar */
+    .review-nav {
+      display: flex; align-items: center; gap: 8px;
+      justify-content: center;
+    }
+    .review-nav button {
+      background: #0f3460; border: 1px solid #1a3a5c;
+      color: #4ecca3; width: 42px; height: 36px; border-radius: 6px;
+      cursor: pointer; font-size: 18px; font-weight: bold;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .review-nav button:hover { background: #1a4a3a; }
+    .review-nav button:disabled { opacity: 0.3; cursor: default; }
+    #rev-move-label {
+      color: #8899aa; font-size: 13px; min-width: 120px;
+      text-align: center; font-weight: 600;
+    }
+
+    /* Right side: analysis panel */
+    .review-panel {
+      flex: 1; display: flex; flex-direction: column;
+      gap: 14px; position: relative;
+      min-width: 280px; max-width: 360px;
+    }
+    .review-panel .card { position: relative; }
+
+    .rev-close-btn {
+      position: fixed; top: 16px; right: 24px;
+      background: #16213e; border: 2px solid #1a3a5c;
+      color: #999; width: 40px; height: 40px;
+      border-radius: 50%; cursor: pointer; z-index: 510;
+      font-size: 22px; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .rev-close-btn:hover { color: #fff; border-color: #4ecca3; }
+
+    /* Opening card */
+    .rev-opening-name {
+      font-size: 18px; font-weight: 800; color: #e0e0e0;
+      margin-bottom: 4px;
+    }
+    .rev-opening-eco {
+      font-size: 11px; color: #4ecca3; font-weight: 700;
+      margin-bottom: 10px; letter-spacing: 1px;
+    }
+    .rev-opening-counter {
+      font-size: 12px; color: #8899aa; line-height: 1.5;
+      background: #0f1a2e; border-radius: 6px; padding: 10px;
+      border-left: 3px solid #4ecca3;
+    }
+    .rev-opening-counter strong { color: #4ecca3; }
+
+    /* Progress */
+    .rev-progress-bar {
+      height: 6px; background: #0f1a2e; border-radius: 3px;
+      margin-top: 8px; overflow: hidden;
+    }
+    .rev-progress-fill {
+      height: 100%; background: #4ecca3; width: 0%;
+      transition: width 0.3s; border-radius: 3px;
+    }
+    .rev-progress-text {
+      font-size: 12px; color: #7a8899;
+    }
+
+    /* Eval graph */
+    .rev-eval-graph-wrap {
+      height: 80px; background: #0f1a2e; border-radius: 6px;
+      overflow: hidden; position: relative;
+    }
+    .rev-eval-graph-wrap svg { width: 100%; height: 100%; }
+
+    /* Summary stats */
+    .rev-summary-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .rev-summary-side { text-align: center; }
+    .rev-summary-side h4 {
+      font-size: 12px; color: #7a8899; margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .rev-accuracy {
+      font-size: 32px; font-weight: 900; margin-bottom: 8px;
+    }
+    .rev-accuracy-label {
+      font-size: 10px; color: #556; text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 8px;
+    }
+    .rev-cat-list { font-size: 11px; text-align: left; }
+    .rev-cat-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 2px 0;
+    }
+    .rev-cat-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .rev-cat-label { color: #8899aa; flex: 1; }
+    .rev-cat-count { color: #ccc; font-weight: 700; }
+
+    /* ELO estimate */
+    .rev-elo-estimate {
+      font-size: 22px; font-weight: 900; color: #e6b920;
+      margin-bottom: 2px;
+    }
+    .rev-elo-label {
+      font-size: 10px; color: #556; text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 8px;
+    }
+
+    /* Review move list */
+    .review-moves-scroll {
+      max-height: 220px; overflow-y: auto; font-size: 12px;
+    }
+    .review-moves-scroll::-webkit-scrollbar { width: 4px; }
+    .review-moves-scroll::-webkit-scrollbar-thumb { background: #1a3a5c; border-radius: 2px; }
+
+    .rev-move-row {
+      display: grid; grid-template-columns: 28px 1fr 1fr;
+      gap: 4px; padding: 4px 4px;
+      border-bottom: 1px solid #0f1a2e; color: #7a8899;
+      cursor: pointer; border-radius: 4px; transition: background 0.1s;
+    }
+    .rev-move-row:hover { background: #0f3460; }
+    .rev-move-row.active { background: #1a4a3a; }
+    .rev-move-row .num { color: #445; }
+    .rev-move-row .mv {
+      color: #bcc; display: flex; align-items: center; gap: 4px;
+    }
+
+    /* Move detail */
+    .rev-detail-badge {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 0;
+    }
+    .rev-detail-icon {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 900; color: #fff;
+      flex-shrink: 0;
+    }
+    .rev-detail-info { display: flex; flex-direction: column; gap: 2px; }
+    .rev-detail-name { font-size: 15px; font-weight: 700; }
+    .rev-detail-sub { font-size: 11px; color: #667; }
+    .rev-detail-best {
+      margin-top: 8px; font-size: 12px; color: #7a8899;
+      background: #0f1a2e; border-radius: 6px; padding: 8px 10px;
+    }
+    .rev-detail-best strong { color: #81b64c; }
+
+    /* Assessment badge on review board */
+    .sq .assess-badge {
+      position: absolute; top: -6px; right: -6px;
+      width: 24px; height: 24px;
+      border-radius: 50%; z-index: 10;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 900;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      pointer-events: none;
+      animation: badgePop 0.3s ease-out;
+    }
+    @keyframes badgePop {
+      0% { transform: scale(0); }
+      60% { transform: scale(1.3); }
+      100% { transform: scale(1); }
+    }
+
+    /* Stockfish required message */
+    .rev-no-engine {
+      text-align: center; padding: 30px 20px; color: #7a8899;
+    }
+    .rev-no-engine h3 { color: #e09020; font-size: 16px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -278,12 +488,11 @@
 <div class="board-frame">
   <div class="rank-labels" id="rank-labels"></div>
   <div class="file-labels" id="file-labels"></div>
-  <div id="board"></div>
+  <div id="board" class="board-grid"></div>
 </div>
 
 <!-- ══════════  SIDEBAR  ══════════ -->
 <div class="sidebar">
-
   <div class="card">
     <h3>Status</h3>
     <div id="status">Initializing...</div>
@@ -320,18 +529,83 @@
     </div>
   </div>
 
-  <div class="card" id="assessment-card">
-    <h3>Move Assessment</h3>
-    <div id="assessment-content">
-      <div class="assess-waiting">Play a move to see assessment</div>
+  <div class="card" id="opening-card" style="display:none">
+    <h3>Opening Detected</h3>
+    <div class="opening-display visible">
+      <div class="opening-name" id="live-opening-name"></div>
+      <div class="opening-eco" id="live-opening-eco"></div>
     </div>
   </div>
 
-  <button id="btn-new">New Game</button>
+  <div class="game-buttons">
+    <button id="btn-new">New Game</button>
+    <button id="btn-review">Review Game</button>
+  </div>
 
   <div class="card">
     <h3>Move History</h3>
     <div class="history-scroll" id="history"></div>
+  </div>
+</div>
+
+<!-- ══════════  REVIEW OVERLAY  ══════════ -->
+<div id="review-overlay">
+  <button class="rev-close-btn" id="rev-close">&times;</button>
+  <div class="review-layout">
+    <div class="review-left">
+      <div class="review-board-row">
+        <div class="review-eval-bar" id="review-eval-bar">
+          <div class="rev-eval-black" id="rev-eval-black" style="flex:1"></div>
+          <div class="rev-eval-white" id="rev-eval-white" style="flex:1"></div>
+          <span class="rev-eval-label" id="rev-eval-label">0.0</span>
+        </div>
+        <div class="review-frame">
+          <div id="review-board" class="board-grid"></div>
+        </div>
+      </div>
+      <div class="review-nav">
+        <button id="rev-first" title="First">&laquo;</button>
+        <button id="rev-prev" title="Previous">&lsaquo;</button>
+        <span id="rev-move-label">Start</span>
+        <button id="rev-next" title="Next">&rsaquo;</button>
+        <button id="rev-last" title="Last">&raquo;</button>
+      </div>
+    </div>
+    <div class="review-panel">
+      <!-- Opening -->
+      <div class="card" id="rev-opening-card" style="display:none">
+        <h3>Opening Detected</h3>
+        <div class="rev-opening-name" id="rev-opening-name"></div>
+        <div class="rev-opening-eco" id="rev-opening-eco"></div>
+        <div class="rev-opening-counter" id="rev-opening-counter"></div>
+      </div>
+      <!-- Progress -->
+      <div class="card" id="rev-progress-card">
+        <h3>Analysis</h3>
+        <div class="rev-progress-text" id="rev-progress-text">Preparing analysis...</div>
+        <div class="rev-progress-bar"><div class="rev-progress-fill" id="rev-progress-fill"></div></div>
+      </div>
+      <!-- Eval graph -->
+      <div class="card" id="rev-graph-card" style="display:none">
+        <h3>Evaluation</h3>
+        <div class="rev-eval-graph-wrap"><svg id="rev-eval-graph"></svg></div>
+      </div>
+      <!-- Summary -->
+      <div class="card" id="rev-summary-card" style="display:none">
+        <h3>Game Summary</h3>
+        <div id="rev-summary"></div>
+      </div>
+      <!-- Move detail -->
+      <div class="card" id="rev-detail-card" style="display:none">
+        <h3>Move Detail</h3>
+        <div id="rev-detail-content"></div>
+      </div>
+      <!-- Move list -->
+      <div class="card" id="rev-moves-card">
+        <h3>Moves</h3>
+        <div class="review-moves-scroll" id="rev-moves-list"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -375,13 +649,13 @@ const PIECE_VAL = { P:100, N:320, B:330, R:500, Q:900, K:20000 };
 const ASSESSMENTS = {
   brilliant:  { label: 'Brilliant',   symbol: '!!', color: '#1cada1' },
   great:      { label: 'Great Move',  symbol: '!',  color: '#5b8bb4' },
-  best:       { label: 'Best Move',   symbol: '\u2605',  color: '#81b64c' },
-  excellent:  { label: 'Excellent',   symbol: '\u2191',  color: '#81b64c' },
-  good:       { label: 'Good',        symbol: '\u2713',  color: '#97af8b' },
-  book:       { label: 'Book',        symbol: '\u2261',  color: '#a98862' },
+  best:       { label: 'Best Move',   symbol: '\u2605', color: '#81b64c' },
+  excellent:  { label: 'Excellent',   symbol: '\u2191', color: '#81b64c' },
+  good:       { label: 'Good',        symbol: '\u2713', color: '#97af8b' },
+  book:       { label: 'Book',        symbol: '\u2261', color: '#a98862' },
   inaccuracy: { label: 'Inaccuracy',  symbol: '?!', color: '#e6b920' },
   mistake:    { label: 'Mistake',     symbol: '?',  color: '#e09020' },
-  miss:       { label: 'Miss',        symbol: '\u2717',  color: '#ca3431' },
+  miss:       { label: 'Miss',        symbol: '\u2717', color: '#ca3431' },
   blunder:    { label: 'Blunder',     symbol: '??', color: '#ca3431' },
 };
 
@@ -410,7 +684,184 @@ const PST = {
 };
 
 // ═══════════════════════════════════════════════
-//  CHESS ENGINE (internal - for move gen & UI)
+//  OPENING DATABASE (sorted longest-first)
+// ═══════════════════════════════════════════════
+const OPENINGS = [
+  // ── Sicilian Variations ──
+  { moves: 'e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6',
+    name: 'Sicilian Najdorf', eco: 'B90',
+    counter: '<strong>Best counter:</strong> The English Attack (6.Be3) is White\'s most dangerous weapon, planning f3, Qd2, O-O-O and a kingside pawn storm with g4-g5. The classical 6.Bg5 also leads to razor-sharp play.' },
+  { moves: 'e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 g7g6',
+    name: 'Sicilian Dragon', eco: 'B70',
+    counter: '<strong>Best counter:</strong> The Yugoslav Attack (6.Be3, 7.f3, 8.Qd2, 9.Bc4/O-O-O) is critical. White storms the kingside with h4-h5 while castling queenside.' },
+  { moves: 'e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 e7e6',
+    name: 'Sicilian Scheveningen', eco: 'B80',
+    counter: '<strong>Best counter:</strong> The Keres Attack (6.g4) puts immediate pressure on Black\'s flexible but slightly passive setup. The English Attack is also strong.' },
+  { moves: 'e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 b8c6',
+    name: 'Sicilian Classical', eco: 'B56',
+    counter: '<strong>Best counter:</strong> The Richter-Rauzer Attack (6.Bg5) leads to complex middlegame positions. White aims to exploit the pin on f6 and attack on the kingside.' },
+  { moves: 'e2e4 c7c5 g1f3 b8c6 d2d4 c5d4 f3d4 g8f6 b1c3 e7e5',
+    name: 'Sicilian Sveshnikov', eco: 'B33',
+    counter: '<strong>Best counter:</strong> After 6.Ndb5 d6, White gets a strong outpost on d5 and the bishop pair. Play 7.Bg5 to maintain pressure and exploit Black\'s backward d-pawn.' },
+  { moves: 'e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4',
+    name: 'Open Sicilian', eco: 'B32',
+    counter: '<strong>Best counter:</strong> White has a central space advantage. Develop quickly with Nc3, Be2/Bc4, and castle kingside or queenside depending on the variation.' },
+  { moves: 'e2e4 c7c5 c2c3',
+    name: 'Sicilian Alapin', eco: 'B22',
+    counter: '<strong>Best counter:</strong> Black should play ...d5 immediately, striking the center before White can build with d4. After exd5 Qxd5, Black has active piece play.' },
+  { moves: 'e2e4 c7c5 b1c3',
+    name: 'Closed Sicilian', eco: 'B23',
+    counter: '<strong>Best counter:</strong> Black should fianchetto the dark bishop with ...g6, ...Bg7 and prepare ...d6, ...e5 for a solid setup with kingside counterplay.' },
+  { moves: 'e2e4 c7c5',
+    name: 'Sicilian Defense', eco: 'B20',
+    counter: '<strong>Best counter:</strong> The Open Sicilian (2.Nf3 + 3.d4) leads to the richest play. Anti-Sicilian options like 2.Nc3 or 2.c3 are solid alternatives.' },
+
+  // ── Caro-Kann Variations ──
+  { moves: 'e2e4 c7c6 d2d4 d7d5 b1c3 d5e4 c3e4 c8f5',
+    name: 'Caro-Kann Classical', eco: 'B18',
+    counter: '<strong>Best counter:</strong> 5.Ng3 Bg6 6.h4 h6 7.Nf3 Nd7 8.h5 is the main line. White gains space on the kingside while Black\'s bishop is driven to a passive square.' },
+  { moves: 'e2e4 c7c6 d2d4 d7d5 e4e5',
+    name: 'Caro-Kann Advance', eco: 'B12',
+    counter: '<strong>Best counter:</strong> Black plays ...Bf5, ...e6, ...c5 to undermine White\'s center. The Short Variation (3...Bf5 4.Nf3 e6 5.Be2) gives White a slight space edge.' },
+  { moves: 'e2e4 c7c6 d2d4 d7d5 e4d5 c6d5',
+    name: 'Caro-Kann Exchange', eco: 'B13',
+    counter: '<strong>Best counter:</strong> White should play for a minority attack on the queenside with Bd3, c3, Qc2, Nd2-b3-c5. The symmetric structure requires patience.' },
+  { moves: 'e2e4 c7c6',
+    name: 'Caro-Kann Defense', eco: 'B10',
+    counter: '<strong>Best counter:</strong> 2.d4 d5 is the mainline. The Advance (3.e5) is aggressive, while the Classical (3.Nc3/Nd2) leads to strategic battles.' },
+
+  // ── French Variations ──
+  { moves: 'e2e4 e7e6 d2d4 d7d5 b1c3 f8b4',
+    name: 'French Winawer', eco: 'C15',
+    counter: '<strong>Best counter:</strong> 4.e5 c5 5.a3 Bxc3+ 6.bxc3 gives White the bishop pair and a kingside pawn storm. Black must counter on the queenside quickly.' },
+  { moves: 'e2e4 e7e6 d2d4 d7d5 b1c3 g8f6',
+    name: 'French Classical', eco: 'C11',
+    counter: '<strong>Best counter:</strong> 4.e5 Nfd7 5.f4 leads to the Steinitz Variation. White builds a strong center and aims for a kingside attack.' },
+  { moves: 'e2e4 e7e6 d2d4 d7d5 e4e5',
+    name: 'French Advance', eco: 'C02',
+    counter: '<strong>Best counter:</strong> White should support the e5 pawn with f4 (after Nf3) and aim for a kingside attack. Black will counter with ...c5 and ...Nc6.' },
+  { moves: 'e2e4 e7e6 d2d4 d7d5 b1d2',
+    name: 'French Tarrasch', eco: 'C03',
+    counter: '<strong>Best counter:</strong> A solid, flexible system. White avoids doubled pawns and develops naturally. Play for the e5 advance or the Classical setup.' },
+  { moves: 'e2e4 e7e6',
+    name: 'French Defense', eco: 'C00',
+    counter: '<strong>Best counter:</strong> 2.d4 d5 is standard. The Advance, Winawer, and Classical are all strong options. Choose based on whether you prefer tactical or positional play.' },
+
+  // ── e4 e5 Openings ──
+  { moves: 'e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 b2b4',
+    name: 'Evans Gambit', eco: 'C51',
+    counter: '<strong>Best counter:</strong> Accept with ...Bxb4, then play ...Ba5 to keep the bishop active. Black must return the pawn at the right moment to equalize.' },
+  { moves: 'e2e4 e7e5 g1f3 b8c6 f1b5 a7a6',
+    name: 'Ruy Lopez Morphy Defense', eco: 'C78',
+    counter: '<strong>Best counter:</strong> 4.Ba4 Nf6 5.O-O leads to the main lines. White should play for a long-term positional advantage with d3-c3-d4.' },
+  { moves: 'e2e4 e7e5 g1f3 b8c6 f1b5 g8f6',
+    name: 'Ruy Lopez Berlin Defense', eco: 'C65',
+    counter: '<strong>Best counter:</strong> 4.O-O Nxe4 5.d4 leads to the endgame-like Berlin Wall. White should press the bishop pair advantage. 4.d3 avoids the endgame.' },
+  { moves: 'e2e4 e7e5 g1f3 b8c6 f1b5',
+    name: 'Ruy Lopez', eco: 'C60',
+    counter: '<strong>Best counter:</strong> White aims for long-term positional pressure. The Morphy Defense (3...a6) is Black\'s most popular response, forcing White to commit the bishop.' },
+  { moves: 'e2e4 e7e5 g1f3 b8c6 f1c4 f8c5',
+    name: 'Giuoco Piano', eco: 'C53',
+    counter: '<strong>Best counter:</strong> The slow d3/c3 setup leads to a strategic game. White can also play the aggressive d4 (Giuoco Pianissimo vs. main line).' },
+  { moves: 'e2e4 e7e5 g1f3 b8c6 f1c4 g8f6',
+    name: 'Two Knights Defense', eco: 'C55',
+    counter: '<strong>Best counter:</strong> 4.Ng5 targets f7 immediately. After 4...d5 5.exd5, the Fried Liver (5...Nxd5 6.Nxf7) is spectacular but 5...Na5 is sounder for Black.' },
+  { moves: 'e2e4 e7e5 g1f3 b8c6 f1c4',
+    name: 'Italian Game', eco: 'C50',
+    counter: '<strong>Best counter:</strong> A natural developing move targeting f7. White should play c3 and d4 for central control, or develop slowly with d3 for a positional game.' },
+  { moves: 'e2e4 e7e5 g1f3 b8c6 d2d4',
+    name: 'Scotch Game', eco: 'C45',
+    counter: '<strong>Best counter:</strong> After 3...exd4 4.Nxd4, White has an open game with good piece activity. Play Nxc6 or Be3 for solid development.' },
+  { moves: 'e2e4 e7e5 g1f3 g8f6',
+    name: 'Petrov Defense', eco: 'C42',
+    counter: '<strong>Best counter:</strong> 3.Nxe5 d6 4.Nf3 Nxe4 5.d4 is the main line. White gets a small but stable advantage with careful play. Avoid 3.d4?! which is premature.' },
+  { moves: 'e2e4 e7e5 f2f4',
+    name: "King's Gambit", eco: 'C30',
+    counter: '<strong>Best counter:</strong> White sacrifices a pawn for rapid development and attacking chances. Black can decline with ...Bc5 or accept with ...exf4 and hold on.' },
+  { moves: 'e2e4 e7e5 b1c3',
+    name: 'Vienna Game', eco: 'C25',
+    counter: '<strong>Best counter:</strong> White prepares f4 without committing the knight to f3. Black should play ...Nf6 and ...Bc5 for active development.' },
+  { moves: 'e2e4 e7e5',
+    name: "King's Pawn Game", eco: 'C20',
+    counter: '<strong>Best counter:</strong> 2.Nf3 develops naturally and attacks e5. The Italian, Ruy Lopez, and Scotch are all excellent continuations.' },
+
+  // ── Other e4 responses ──
+  { moves: 'e2e4 d7d5',
+    name: 'Scandinavian Defense', eco: 'B01',
+    counter: '<strong>Best counter:</strong> 2.exd5 Qxd5 3.Nc3 gains a tempo on the queen. Black must spend time repositioning the queen while White develops freely.' },
+  { moves: 'e2e4 d7d6',
+    name: 'Pirc Defense', eco: 'B07',
+    counter: '<strong>Best counter:</strong> 2.d4 Nf6 3.Nc3 g6 4.f4 (Austrian Attack) is the most aggressive approach, seizing space and preparing a kingside offensive.' },
+  { moves: 'e2e4 g8f6',
+    name: "Alekhine's Defense", eco: 'B02',
+    counter: '<strong>Best counter:</strong> 2.e5 Nd5 3.d4 d6 4.Nf3 is the Four Pawns Attack prep. White builds a strong center but must avoid overextension.' },
+
+  // ── Queen's Pawn Openings ──
+  { moves: 'd2d4 d7d5 c2c4 c7c6 g1f3 g8f6 b1c3 e7e6',
+    name: 'Semi-Slav Defense', eco: 'D43',
+    counter: '<strong>Best counter:</strong> The Meran Variation (5.e3 Nbd7 6.Bd3) leads to complex pawn structures. The Anti-Meran with 5.Bg5 is sharper.' },
+  { moves: 'd2d4 d7d5 c2c4 e7e6',
+    name: "Queen's Gambit Declined", eco: 'D30',
+    counter: '<strong>Best counter:</strong> White should play for a minority attack with b4-b5 or a central breakthrough with e4. The Exchange Variation (cxd5) simplifies strategically.' },
+  { moves: 'd2d4 d7d5 c2c4 d5c4',
+    name: "Queen's Gambit Accepted", eco: 'D20',
+    counter: '<strong>Best counter:</strong> White regains the pawn easily with e3/Bxc4. The key advantage is a strong center. Play e4 when possible for a powerful pawn duo.' },
+  { moves: 'd2d4 d7d5 c2c4 c7c6',
+    name: 'Slav Defense', eco: 'D10',
+    counter: '<strong>Best counter:</strong> 3.Nf3 Nf6 4.Nc3 is the main line. White should play for e4 or a queenside minority attack. The Exchange Slav leads to open, equal play.' },
+  { moves: 'd2d4 g8f6 c2c4 g7g6 b1c3 f8g7 e2e4 d7d6',
+    name: "King's Indian Defense", eco: 'E70',
+    counter: '<strong>Best counter:</strong> The Classical Variation (Nf3, Be2, O-O) and the S\u00e4misch (f3) are main weapons. White should use the space advantage on the queenside.' },
+  { moves: 'd2d4 g8f6 c2c4 g7g6 b1c3 d7d5',
+    name: "Gr\u00fcnfeld Defense", eco: 'D80',
+    counter: '<strong>Best counter:</strong> 4.cxd5 Nxd5 5.e4 gives White a powerful center. Black will counterattack with ...c5 and ...Nc6. White must keep the center intact.' },
+  { moves: 'd2d4 g8f6 c2c4 e7e6 b1c3 f8b4',
+    name: 'Nimzo-Indian Defense', eco: 'E20',
+    counter: '<strong>Best counter:</strong> The Classical (4.Qc2) avoids doubled pawns. The Rubinstein (4.e3) is solid. Both lead to rich middlegame positions.' },
+  { moves: 'd2d4 g8f6 c2c4 e7e6 g1f3 b7b6',
+    name: "Queen's Indian Defense", eco: 'E15',
+    counter: '<strong>Best counter:</strong> 4.g3 (Fianchetto) is the main system. White mirrors Black\'s fianchetto and fights for the long diagonal. 4.a3 is a modern alternative.' },
+  { moves: 'd2d4 g8f6 c2c4 c7c5 d4d5 e7e6',
+    name: 'Benoni Defense', eco: 'A60',
+    counter: '<strong>Best counter:</strong> White should play for e4 and a central space advantage. The Modern Benoni gives Black queenside counterplay but White\'s center is dominant.' },
+  { moves: 'd2d4 d7d5 c1f4',
+    name: 'London System', eco: 'D00',
+    counter: '<strong>Best counter:</strong> Black should play ...c5 early to challenge the center, or ...Bf5 to mirror White\'s setup. The London is solid but can be met with active play.' },
+  { moves: 'd2d4 g8f6 c1f4',
+    name: 'London System', eco: 'D00',
+    counter: '<strong>Best counter:</strong> Black should play ...c5 early to challenge the center, or ...d5 followed by ...Bf5 to fight for the light squares.' },
+  { moves: 'd2d4 d7d5 c2c4',
+    name: "Queen's Gambit", eco: 'D06',
+    counter: '<strong>Best counter:</strong> Black can decline with ...e6 (QGD, solid) or accept with ...dxc4 (QGA, active). The Slav (...c6) is another popular option.' },
+  { moves: 'd2d4 f7f5',
+    name: 'Dutch Defense', eco: 'A80',
+    counter: '<strong>Best counter:</strong> White can play 2.g3 (Leningrad setup) or exploit the weakened e8-h5 diagonal. The Staunton Gambit (2.e4) is a sharp surprise weapon.' },
+
+  // ── Flank Openings ──
+  { moves: 'c2c4 e7e5',
+    name: 'English Opening, Reversed Sicilian', eco: 'A20',
+    counter: '<strong>Best counter:</strong> White plays a Sicilian with an extra tempo. Develop with Nc3, g3, Bg2 and fight for the center with d3 and e3/e4.' },
+  { moves: 'c2c4',
+    name: 'English Opening', eco: 'A10',
+    counter: '<strong>Best counter:</strong> A flexible system. White usually fianchettoes (g3, Bg2) and plays for central control with Nc3, e3/e4 or d3/d4.' },
+  { moves: 'g1f3 d7d5 c2c4',
+    name: 'R\u00e9ti Opening', eco: 'A09',
+    counter: '<strong>Best counter:</strong> White transposes into various Queen\'s Pawn setups. The idea is flexibility \u2014 White delays committing the d-pawn.' },
+  { moves: 'g1f3 d7d5',
+    name: 'R\u00e9ti Opening', eco: 'A04',
+    counter: '<strong>Best counter:</strong> A hypermodern approach. White controls the center with pieces rather than pawns. Usually transposes to d4 or c4 systems.' },
+
+  // ── Base entries (least specific) ──
+  { moves: 'e2e4',
+    name: "King's Pawn Opening", eco: 'B00',
+    counter: '<strong>Best counter:</strong> Black has many responses: ...e5 (open game), ...c5 (Sicilian), ...e6 (French), ...c6 (Caro-Kann). Choose based on your style.' },
+  { moves: 'd2d4',
+    name: "Queen's Pawn Opening", eco: 'A40',
+    counter: '<strong>Best counter:</strong> Black can respond with ...d5 (classical), ...Nf6 (Indian systems), or ...f5 (Dutch). Indian defenses offer the most dynamic play.' },
+];
+
+// ═══════════════════════════════════════════════
+//  CHESS ENGINE (move generation & validation)
 // ═══════════════════════════════════════════════
 function mkPiece(type, color) { return { type, color }; }
 
@@ -436,7 +887,7 @@ function genPseudo(board, r, c, ep, castle) {
     for (const [dr,dc] of dirs) {
       let nr=r+dr, nc=c+dc;
       while (inBounds(nr,nc)) {
-        if (!board[nr][nc]) { moves.push({fr:r,fc:c,tr:nr,tc:nc}); }
+        if (!board[nr][nc]) moves.push({fr:r,fc:c,tr:nr,tc:nc});
         else { if (board[nr][nc].color===en) moves.push({fr:r,fc:c,tr:nr,tc:nc,cap:true}); break; }
         nr+=dr; nc+=dc;
       }
@@ -456,8 +907,7 @@ function genPseudo(board, r, c, ep, castle) {
     }
   } else if (type==='N') {
     for (const [dr,dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]) {
-      const nr=r+dr,nc=c+dc;
-      if (!inBounds(nr,nc)) continue;
+      const nr=r+dr,nc=c+dc; if (!inBounds(nr,nc)) continue;
       if (!board[nr][nc]) moves.push({fr:r,fc:c,tr:nr,tc:nc});
       else if (board[nr][nc].color===en) moves.push({fr:r,fc:c,tr:nr,tc:nc,cap:true});
     }
@@ -466,8 +916,7 @@ function genPseudo(board, r, c, ep, castle) {
     else if (type==='Q') { slide([[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]]); }
     else if (type==='K') {
     for (const [dr,dc] of [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]) {
-      const nr=r+dr,nc=c+dc;
-      if (!inBounds(nr,nc)) continue;
+      const nr=r+dr,nc=c+dc; if (!inBounds(nr,nc)) continue;
       if (!board[nr][nc]) moves.push({fr:r,fc:c,tr:nr,tc:nc});
       else if (board[nr][nc].color===en) moves.push({fr:r,fc:c,tr:nr,tc:nc,cap:true});
     }
@@ -548,7 +997,7 @@ function allLegalMoves(board, color, ep, castle) {
   return moves;
 }
 
-// Fallback minimax (used when Stockfish unavailable)
+// Fallback minimax
 function evaluate(board) {
   let score=0;
   for (let r=0;r<8;r++) for (let c=0;c<8;c++) {
@@ -600,10 +1049,8 @@ function fallbackBotMove(board, color, ep, castle, elo) {
     const val=minimax(nb,depth-1,-Infinity,Infinity,!maxing,opp(color),nep,updateCastle(castle,mv,board));
     if (maxing?val>bestVal:val<bestVal) { bestVal=val; best=mv; }
   }
-  // Add randomness for lower ELOs
-  if (elo < 1500 && Math.random() < (1500 - elo) / 2000) {
+  if (elo < 1500 && Math.random() < (1500 - elo) / 2000)
     return moves[Math.floor(Math.random()*moves.length)];
-  }
   return best;
 }
 
@@ -619,124 +1066,114 @@ function boardToFEN(board, turn, castle, ep, halfmove, fullmove) {
     for (let c=0; c<8; c++) {
       const p=board[r][c];
       if (!p) { empty++; }
-      else {
-        if (empty) { fen+=empty; empty=0; }
-        fen += p.color==='w' ? p.type : p.type.toLowerCase();
-      }
+      else { if (empty) { fen+=empty; empty=0; } fen+=p.color==='w'?p.type:p.type.toLowerCase(); }
     }
     if (empty) fen+=empty;
     if (r<7) fen+='/';
   }
-  fen += ' '+turn;
+  fen+=' '+turn;
   let cs='';
   if (castle.wK) cs+='K'; if (castle.wQ) cs+='Q';
   if (castle.bK) cs+='k'; if (castle.bQ) cs+='q';
-  fen += ' '+(cs||'-');
-  if (ep) fen += ' '+FILES[ep[1]]+RANKS[ep[0]];
-  else fen += ' -';
-  fen += ' '+(halfmove||0)+' '+(fullmove||1);
+  fen+=' '+(cs||'-');
+  if (ep) fen+=' '+FILES[ep[1]]+RANKS[ep[0]]; else fen+=' -';
+  fen+=' '+(halfmove||0)+' '+(fullmove||1);
   return fen;
 }
 
+function fenToBoard(fen) {
+  const rows = fen.split(' ')[0].split('/');
+  const board = Array.from({length:8}, () => Array(8).fill(null));
+  for (let r=0; r<8; r++) {
+    let c=0;
+    for (const ch of rows[r]) {
+      if (ch>='1'&&ch<='8') { c+=parseInt(ch); }
+      else { board[r][c]=mkPiece(ch.toUpperCase(), ch===ch.toUpperCase()?W:B); c++; }
+    }
+  }
+  return board;
+}
+
 function moveToUCI(mv, promoType) {
-  let uci = FILES[mv.fc]+RANKS[mv.fr]+FILES[mv.tc]+RANKS[mv.tr];
-  if (mv.promo) uci += (promoType||'q').toLowerCase();
+  let uci=FILES[mv.fc]+RANKS[mv.fr]+FILES[mv.tc]+RANKS[mv.tr];
+  if (mv.promo) uci+=(promoType||'q').toLowerCase();
   return uci;
 }
 
 function uciToSquares(uci) {
-  if (!uci || uci.length < 4) return null;
+  if (!uci||uci.length<4) return null;
   return {
     fc: FILES.indexOf(uci[0]), fr: RANKS.indexOf(uci[1]),
     tc: FILES.indexOf(uci[2]), tr: RANKS.indexOf(uci[3]),
-    promoPiece: uci[4] ? uci[4].toUpperCase() : null
+    promoPiece: uci[4]?uci[4].toUpperCase():null
   };
 }
 
+function uciToAlgebraic(uci, board) {
+  if (!uci||!board) return uci;
+  const sq = uciToSquares(uci); if (!sq) return uci;
+  const piece = board[sq.fr][sq.fc];
+  if (!piece) return FILES[sq.tc]+RANKS[sq.tr];
+  const target = board[sq.tr][sq.tc];
+  const cap = target ? 'x' : '';
+  if (piece.type === 'P') {
+    const f = cap ? FILES[sq.fc] : '';
+    const promo = sq.promoPiece ? '='+sq.promoPiece : '';
+    return f+cap+FILES[sq.tc]+RANKS[sq.tr]+promo;
+  }
+  return piece.type+cap+FILES[sq.tc]+RANKS[sq.tr];
+}
+
 // ═══════════════════════════════════════════════
-//  STOCKFISH INTEGRATION
+//  STOCKFISH INTEGRATION (single worker)
 // ═══════════════════════════════════════════════
 class StockfishEngine {
-  constructor() {
-    this.worker = null;
-    this.ready = false;
-    this.listeners = [];
-    this.messageBuffer = [];
-  }
+  constructor() { this.worker=null; this.ready=false; this.listeners=[]; }
 
   async init() {
     return new Promise((resolve, reject) => {
       try {
-        // Create worker using importScripts (works cross-origin)
         const code = `importScripts('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');`;
         const blob = new Blob([code], { type: 'application/javascript' });
         this.worker = new Worker(URL.createObjectURL(blob));
-
-        const timeout = setTimeout(() => {
-          reject(new Error('Stockfish init timeout'));
-        }, 10000);
-
+        const timeout = setTimeout(() => reject(new Error('Stockfish init timeout')), 10000);
         this.worker.onmessage = (e) => {
-          const line = typeof e.data === 'string' ? e.data : '';
-          this.messageBuffer.push(line);
+          const line = typeof e.data==='string'?e.data:'';
           for (const cb of this.listeners) cb(line);
-
-          if (line.includes('uciok')) {
-            clearTimeout(timeout);
-            this.ready = true;
-            resolve();
-          }
+          if (line.includes('uciok')) { clearTimeout(timeout); this.ready=true; resolve(); }
         };
-
-        this.worker.onerror = (e) => {
-          clearTimeout(timeout);
-          reject(e);
-        };
-
+        this.worker.onerror = (e) => { clearTimeout(timeout); reject(e); };
         this.worker.postMessage('uci');
-      } catch (e) {
-        reject(e);
-      }
+      } catch (e) { reject(e); }
     });
   }
 
-  send(cmd) {
-    if (this.worker) this.worker.postMessage(cmd);
-  }
-
+  send(cmd) { if (this.worker) this.worker.postMessage(cmd); }
   onMessage(cb) { this.listeners.push(cb); }
-  offMessage(cb) { this.listeners = this.listeners.filter(l => l !== cb); }
+  offMessage(cb) { this.listeners=this.listeners.filter(l=>l!==cb); }
 
   async analyze(fen, depth=18) {
     if (!this.ready) return null;
     return new Promise((resolve) => {
-      let bestMove = null, score = 0, scoreMate = null;
-
+      let bestMove=null, score=0, scoreMate=null;
       const handler = (line) => {
-        if (typeof line !== 'string') return;
-        // Parse info lines for the deepest score
-        const infoMatch = line.match(/^info depth (\d+).*?score (cp|mate) (-?\d+)/);
-        if (infoMatch) {
-          const type = infoMatch[2], val = parseInt(infoMatch[3]);
-          if (type === 'mate') {
-            scoreMate = val;
-            score = val > 0 ? 100000 - Math.abs(val)*100 : -100000 + Math.abs(val)*100;
-          } else {
-            scoreMate = null;
-            score = val;
-          }
+        if (typeof line!=='string') return;
+        const m=line.match(/^info depth (\d+).*?score (cp|mate) (-?\d+)/);
+        if (m) {
+          const val=parseInt(m[3]);
+          if (m[2]==='mate') { scoreMate=val; score=val>0?100000-Math.abs(val)*100:-100000+Math.abs(val)*100; }
+          else { scoreMate=null; score=val; }
         }
         if (line.startsWith('bestmove')) {
-          bestMove = line.split(/\s+/)[1];
+          bestMove=line.split(/\s+/)[1];
           this.offMessage(handler);
           resolve({ bestMove, score, scoreMate });
         }
       };
-
       this.onMessage(handler);
       this.send('stop');
-      this.send('position fen ' + fen);
-      this.send('go depth ' + depth);
+      this.send('position fen '+fen);
+      this.send('go depth '+depth);
     });
   }
 
@@ -744,159 +1181,111 @@ class StockfishEngine {
     if (!this.ready) return null;
     return new Promise((resolve) => {
       const handler = (line) => {
-        if (typeof line !== 'string') return;
+        if (typeof line!=='string') return;
         if (line.startsWith('bestmove')) {
-          const move = line.split(/\s+/)[1];
           this.offMessage(handler);
-          resolve(move);
+          resolve(line.split(/\s+/)[1]);
         }
       };
       this.onMessage(handler);
       this.send('stop');
-      this.send('setoption name Skill Level value ' + skillLevel);
-      this.send('position fen ' + fen);
-      this.send('go movetime ' + moveTime);
+      this.send('setoption name Skill Level value '+skillLevel);
+      this.send('position fen '+fen);
+      this.send('go movetime '+moveTime);
     });
   }
 
-  destroy() {
-    if (this.worker) { this.worker.terminate(); this.worker = null; }
-    this.ready = false;
-  }
+  destroy() { if (this.worker) { this.worker.terminate(); this.worker=null; } this.ready=false; }
 }
 
-// ── Globals ──
-let sfPlay = null;     // Stockfish for bot play
-let sfAnalysis = null;  // Stockfish for move assessment
+let sfEngine = null;
 let sfAvailable = false;
 
 async function initStockfish() {
   try {
-    sfPlay = new StockfishEngine();
-    sfAnalysis = new StockfishEngine();
-    await Promise.all([sfPlay.init(), sfAnalysis.init()]);
+    sfEngine = new StockfishEngine();
+    await sfEngine.init();
     sfAvailable = true;
     document.getElementById('engine-dot').className = 'dot ready';
     document.getElementById('engine-label').textContent = 'Stockfish 10+ WASM';
-    setStatus(gs.playerColor === W ? 'Your turn' : 'Bot is thinking...');
-    console.log('Stockfish loaded successfully');
+    setStatus(gs.playerColor===W?'Your turn':'Bot is thinking...');
   } catch (e) {
-    console.warn('Stockfish failed to load, using fallback engine:', e);
+    console.warn('Stockfish failed to load:', e);
     sfAvailable = false;
     document.getElementById('engine-dot').className = 'dot';
     document.getElementById('engine-label').textContent = 'Built-in engine (fallback)';
-    setStatus(gs.playerColor === W ? 'Your turn' : 'Bot is thinking...');
+    setStatus(gs.playerColor===W?'Your turn':'Bot is thinking...');
   }
 }
 
-// ── ELO to Stockfish Skill Level mapping ──
 function eloToSkillLevel(elo) {
-  // Stockfish Skill Level: 0-20
-  // Map 400-3200 ELO range
-  if (elo <= 400) return 0;
-  if (elo >= 2800) return 20;
-  return Math.round((elo - 400) / 120);
+  if (elo<=400) return 0; if (elo>=2800) return 20;
+  return Math.round((elo-400)/120);
 }
-
 function eloToMoveTime(elo) {
-  // Lower ELO = less thinking time
-  if (elo <= 600) return 100;
-  if (elo <= 1000) return 300;
-  if (elo <= 1500) return 500;
-  if (elo <= 2000) return 1000;
-  if (elo <= 2500) return 1500;
-  return 2000;
+  if (elo<=600) return 100; if (elo<=1000) return 300;
+  if (elo<=1500) return 500; if (elo<=2000) return 1000;
+  if (elo<=2500) return 1500; return 2000;
 }
-
 function eloToLabel(elo) {
-  if (elo <= 600) return 'Beginner';
-  if (elo <= 800) return 'Novice';
-  if (elo <= 1000) return 'Casual';
-  if (elo <= 1200) return 'Intermediate';
-  if (elo <= 1400) return 'Club Player';
-  if (elo <= 1600) return 'Tournament';
-  if (elo <= 1800) return 'Strong Club';
-  if (elo <= 2000) return 'Advanced';
-  if (elo <= 2200) return 'Expert';
-  if (elo <= 2400) return 'National Master';
-  if (elo <= 2600) return 'International Master';
-  if (elo <= 2800) return 'Grandmaster';
+  if (elo<=600) return 'Beginner'; if (elo<=800) return 'Novice';
+  if (elo<=1000) return 'Casual'; if (elo<=1200) return 'Intermediate';
+  if (elo<=1400) return 'Club Player'; if (elo<=1600) return 'Tournament';
+  if (elo<=1800) return 'Strong Club'; if (elo<=2000) return 'Advanced';
+  if (elo<=2200) return 'Expert'; if (elo<=2400) return 'National Master';
+  if (elo<=2600) return 'International Master'; if (elo<=2800) return 'Grandmaster';
   return 'Superhuman';
 }
 
 // ═══════════════════════════════════════════════
-//  MOVE ASSESSMENT
+//  MOVE ASSESSMENT (used by review)
 // ═══════════════════════════════════════════════
 function detectSacrifice(board, mv) {
-  const piece = board[mv.fr][mv.fc];
-  if (!piece || piece.type === 'P' || piece.type === 'K') return false;
-  const captured = board[mv.tr][mv.tc];
-  const capturedVal = captured ? PIECE_VAL[captured.type] : 0;
-  const pieceVal = PIECE_VAL[piece.type];
-  // Sacrifice: moving a higher-value piece to an attacked square where it can be captured
-  if (pieceVal > capturedVal + 50) {
-    const nb = applyMove(board, mv);
-    if (attacked(nb, mv.tr, mv.tc, opp(piece.color), null)) return true;
+  const piece=board[mv.fr][mv.fc];
+  if (!piece||piece.type==='P'||piece.type==='K') return false;
+  const captured=board[mv.tr][mv.tc];
+  const capturedVal=captured?PIECE_VAL[captured.type]:0;
+  if (PIECE_VAL[piece.type]>capturedVal+50) {
+    const nb=applyMove(board,mv);
+    if (attacked(nb,mv.tr,mv.tc,opp(piece.color),null)) return true;
   }
   return false;
 }
 
 function classifyMove(cpLoss, playerMoveUCI, bestMoveUCI, moveNumber, board, mv) {
-  const isBestMove = playerMoveUCI === bestMoveUCI;
-  const isSacrifice = detectSacrifice(board, mv);
-
-  if (isBestMove && isSacrifice) return 'brilliant';
-  if (isBestMove && moveNumber <= 8) return 'book';
+  const isBestMove=playerMoveUCI===bestMoveUCI;
+  const isSacrifice=detectSacrifice(board,mv);
+  if (isBestMove&&isSacrifice) return 'brilliant';
+  if (isBestMove&&moveNumber<=8) return 'book';
   if (isBestMove) return 'best';
-  if (cpLoss <= 0 && isSacrifice) return 'brilliant';
-  if (cpLoss <= 0) return 'great';
-  if (cpLoss <= 15) return 'excellent';
-  if (cpLoss <= 40) return 'good';
-  if (cpLoss <= 100) return 'inaccuracy';
-  if (cpLoss <= 250) return 'mistake';
-  if (cpLoss <= 500) return 'miss';
+  if (cpLoss<=0&&isSacrifice) return 'brilliant';
+  if (cpLoss<=0) return 'great';
+  if (cpLoss<=15) return 'excellent';
+  if (cpLoss<=40) return 'good';
+  if (cpLoss<=100) return 'inaccuracy';
+  if (cpLoss<=250) return 'mistake';
+  if (cpLoss<=500) return 'miss';
   return 'blunder';
 }
 
-async function assessMove(fenBefore, fenAfter, playerMoveUCI, moveNumber, board, mv) {
-  if (!sfAvailable || !sfAnalysis) return null;
-
-  try {
-    // Analyze position before the move at high depth
-    const beforeResult = await sfAnalysis.analyze(fenBefore, 18);
-    if (!beforeResult) return null;
-
-    // Analyze position after the move
-    const afterResult = await sfAnalysis.analyze(fenAfter, 18);
-    if (!afterResult) return null;
-
-    // cpLoss = evalBefore + evalAfter (both from side-to-move perspective)
-    // Positive cpLoss = player lost centipawns compared to best
-    const cpLoss = beforeResult.score + afterResult.score;
-
-    const classification = classifyMove(
-      cpLoss, playerMoveUCI, beforeResult.bestMove,
-      moveNumber, board, mv
-    );
-
-    return {
-      type: classification,
-      cpLoss: Math.max(0, cpLoss),
-      bestMove: beforeResult.bestMove,
-      evalBefore: beforeResult.score,
-      evalAfter: -afterResult.score, // normalize to player's perspective
-    };
-  } catch (e) {
-    console.warn('Assessment failed:', e);
-    return null;
+// ═══════════════════════════════════════════════
+//  OPENING DETECTION
+// ═══════════════════════════════════════════════
+function detectOpening(uciMoves) {
+  const moveStr = uciMoves.join(' ');
+  for (const opening of OPENINGS) {
+    if (moveStr === opening.moves || moveStr.startsWith(opening.moves + ' ') || moveStr.startsWith(opening.moves)) {
+      return opening;
+    }
   }
+  return null;
 }
 
 // ═══════════════════════════════════════════════
 //  MOVE NOTATION
 // ═══════════════════════════════════════════════
 function notation(board, mv, check, mate) {
-  const p = board[mv.fr][mv.fc]; if (!p) return '';
+  const p=board[mv.fr][mv.fc]; if(!p) return '';
   const tf=FILES[mv.tc], tr=RANKS[mv.tr];
   let n='';
   if (mv.castleK) n='O-O';
@@ -929,13 +1318,15 @@ let gs = {
   checking: false,
   moveNumber: 1,
   halfmove: 0,
-  lastAssessment: null,      // { square:[r,c], type:'brilliant'|... }
-  assessmentPending: false,
   botThinking: false,
+  // Recording for review
+  fenLog: [],
+  moveLog: [],
+  uciMoves: [],
 };
 
 // ═══════════════════════════════════════════════
-//  RENDERING
+//  RENDERING (game board)
 // ═══════════════════════════════════════════════
 function buildLabels() {
   const rankEl=document.getElementById('rank-labels'), fileEl=document.getElementById('file-labels');
@@ -964,7 +1355,6 @@ function renderBoard() {
     const sq=document.createElement('div');
     const key=`${r},${c}`;
     sq.className='sq '+((r+c)%2===0?'light':'dark');
-    sq.dataset.r=r; sq.dataset.c=c;
 
     if (gs.sel&&gs.sel[0]===r&&gs.sel[1]===c) sq.classList.add('selected');
     else if (lastSqs.has(key)) sq.classList.add(r===gs.lastMv.fr&&c===gs.lastMv.fc?'last-from':'last-to');
@@ -980,21 +1370,9 @@ function renderBoard() {
       const pel=document.createElement('div');
       pel.className=`piece ${piece.color===W?'white':'black'}`;
       const img=document.createElement('img');
-      img.src=PIECE_IMG[piece.color][piece.type];
-      img.alt=piece.type;
+      img.src=PIECE_IMG[piece.color][piece.type]; img.alt=piece.type;
       img.onerror=()=>{ pel.textContent=SYMBOLS[piece.color][piece.type]; };
-      pel.appendChild(img);
-      sq.appendChild(pel);
-    }
-
-    // Assessment badge on board
-    if (gs.lastAssessment && gs.lastAssessment.square[0]===r && gs.lastAssessment.square[1]===c) {
-      const a = ASSESSMENTS[gs.lastAssessment.type];
-      const badge = document.createElement('div');
-      badge.className = 'assess-badge';
-      badge.style.background = a.color;
-      badge.textContent = a.symbol;
-      sq.appendChild(badge);
+      pel.appendChild(img); sq.appendChild(pel);
     }
 
     sq.addEventListener('click', ()=>handleClick(r,c));
@@ -1002,46 +1380,20 @@ function renderBoard() {
   }
 }
 
-function renderAssessment() {
-  const el = document.getElementById('assessment-content');
-  if (gs.assessmentPending) {
-    el.innerHTML = '<div class="assess-waiting">Analyzing move...</div>';
-    return;
-  }
-  if (!gs.lastAssessment) {
-    el.innerHTML = '<div class="assess-waiting">Play a move to see assessment</div>';
-    return;
-  }
-  const a = ASSESSMENTS[gs.lastAssessment.type];
-  const detail = gs.lastAssessment.cpLoss !== undefined
-    ? (gs.lastAssessment.cpLoss > 0 ? `${gs.lastAssessment.cpLoss} centipawn loss` : 'No centipawn loss')
-    : '';
-  el.innerHTML = `
-    <div class="assess-container">
-      <div class="assess-icon" style="background:${a.color}">${a.symbol}</div>
-      <div class="assess-info">
-        <div class="assess-name" style="color:${a.color}">${a.label}</div>
-        <div class="assess-detail">${detail}</div>
-      </div>
-    </div>`;
-}
-
 // ═══════════════════════════════════════════════
-//  INPUT HANDLING
+//  INPUT HANDLING & GAME FLOW
 // ═══════════════════════════════════════════════
 function handleClick(r,c) {
-  if (gs.gameOver || gs.turn!==gs.playerColor || gs.botThinking) return;
+  if (gs.gameOver||gs.turn!==gs.playerColor||gs.botThinking) return;
   const p=gs.board[r][c];
-
   if (gs.sel) {
     const mv=gs.hints.find(m=>m.tr===r&&m.tc===c);
     if (mv) {
-      if (mv.promo) { showPromo(gs.playerColor, type=>doMove({...mv,promoType:type})); }
-      else { doMove(mv); }
+      if (mv.promo) showPromo(gs.playerColor, type=>doMove({...mv,promoType:type}));
+      else doMove(mv);
       return;
     }
   }
-
   if (p&&p.color===gs.playerColor) {
     if (gs.sel&&gs.sel[0]===r&&gs.sel[1]===c) { gs.sel=null; gs.hints=[]; }
     else { gs.sel=[r,c]; gs.hints=legalMovesFor(gs.board,r,c,gs.ep,gs.castle); }
@@ -1049,17 +1401,15 @@ function handleClick(r,c) {
   renderBoard();
 }
 
-async function doMove(mv) {
-  const {board,turn,ep,castle} = gs;
+function doMove(mv) {
+  const {board, turn, ep, castle} = gs;
   const promoType = mv.promoType||'Q';
-
-  // Save FEN before the move for assessment
   const fenBefore = boardToFEN(board, turn, castle, ep, gs.halfmove, gs.moveNumber);
   const playerMoveUCI = moveToUCI(mv, promoType);
 
   const nb = applyMove(board, mv, promoType);
   const nc = updateCastle(castle, mv, board);
-  const nep = mv.dbl ? [mv.fr+(turn===W?-1:1), mv.fc] : null;
+  const nep = mv.dbl?[mv.fr+(turn===W?-1:1), mv.fc]:null;
 
   const nextColor = opp(turn);
   const nextMoves = allLegalMoves(nb, nextColor, nep, nc);
@@ -1072,98 +1422,70 @@ async function doMove(mv) {
   else if (gs.history.length) gs.history[gs.history.length-1].b = note;
   else gs.history.push({w:'...', b:note, wAssess:null, bAssess:null});
 
-  // Update halfmove counter
   const piece = board[mv.fr][mv.fc];
-  if (piece?.type === 'P' || mv.cap || mv.ep) gs.halfmove = 0;
-  else gs.halfmove++;
-
-  if (turn === B) gs.moveNumber++;
+  if (piece?.type==='P'||mv.cap||mv.ep) gs.halfmove=0; else gs.halfmove++;
+  if (turn===B) gs.moveNumber++;
 
   gs.board=nb; gs.castle=nc; gs.ep=nep;
   gs.turn=nextColor; gs.sel=null; gs.hints=[];
   gs.lastMv=mv; gs.checking=oppCheck;
 
+  // Record for review
+  const fenAfter = boardToFEN(nb, nextColor, nc, nep, gs.halfmove, gs.moveNumber);
+  gs.moveLog.push({ fen: fenBefore, uci: playerMoveUCI, notation: note, color: turn, mv:{...mv, promoType} });
+  gs.uciMoves.push(playerMoveUCI);
+  gs.fenLog.push(fenAfter);
+
   if (isCheckmate) {
     gs.gameOver=true;
     setStatus(`Checkmate! ${turn===W?'White':'Black'} wins!`,'game-over');
+    showReviewBtn();
   } else if (isStalemate) {
     gs.gameOver=true;
     setStatus('Stalemate \u2014 Draw','game-over');
+    showReviewBtn();
   } else if (oppCheck) {
     setStatus('Check!','check');
   } else {
     setStatus(nextColor===gs.playerColor?'Your turn':'Bot is thinking...');
   }
 
+  // Update live opening detection
+  updateLiveOpening();
+
   updateHistory();
   renderBoard();
 
-  // ── Assess player move (async) ──
-  const isPlayerMove = turn === gs.playerColor;
-  if (isPlayerMove && sfAvailable) {
-    gs.assessmentPending = true;
-    gs.lastAssessment = null;
-    renderAssessment();
-
-    const fenAfter = boardToFEN(nb, nextColor, nc, nep, gs.halfmove, gs.moveNumber);
-    const currentMoveNumber = turn === W ? gs.history.length : gs.history.length;
-
-    // Run assessment in parallel with bot thinking
-    assessMove(fenBefore, fenAfter, playerMoveUCI, currentMoveNumber, board, mv).then(result => {
-      gs.assessmentPending = false;
-      if (result) {
-        gs.lastAssessment = { square: [mv.tr, mv.tc], type: result.type, cpLoss: result.cpLoss };
-        // Store in history
-        const histIdx = gs.history.length - 1;
-        if (histIdx >= 0) {
-          if (turn === W) gs.history[histIdx].wAssess = result.type;
-          else gs.history[histIdx].bAssess = result.type;
-        }
-      }
-      renderAssessment();
-      updateHistory();
-      renderBoard();
-    });
-  }
-
-  // ── Bot move ──
-  if (!gs.gameOver && gs.turn !== gs.playerColor) {
-    gs.botThinking = true;
-    setTimeout(()=> runBot(), 150);
+  if (!gs.gameOver && gs.turn!==gs.playerColor) {
+    gs.botThinking=true;
+    setTimeout(()=>runBot(), 150);
   }
 }
 
 async function runBot() {
   const fen = boardToFEN(gs.board, gs.turn, gs.castle, gs.ep, gs.halfmove, gs.moveNumber);
 
-  if (sfAvailable && sfPlay) {
-    const skillLevel = eloToSkillLevel(gs.elo);
-    const moveTime = eloToMoveTime(gs.elo);
-
+  if (sfAvailable && sfEngine) {
     try {
-      const uciMove = await sfPlay.getBotMove(fen, skillLevel, moveTime);
-      gs.botThinking = false;
-      if (uciMove && uciMove !== '(none)') {
-        const sq = uciToSquares(uciMove);
+      const uciMove = await sfEngine.getBotMove(fen, eloToSkillLevel(gs.elo), eloToMoveTime(gs.elo));
+      gs.botThinking=false;
+      if (uciMove && uciMove!=='(none)') {
+        const sq=uciToSquares(uciMove);
         if (sq) {
-          // Find the matching legal move
-          const moves = allLegalMoves(gs.board, gs.turn, gs.ep, gs.castle);
-          let match = moves.find(m => m.fr===sq.fr && m.fc===sq.fc && m.tr===sq.tr && m.tc===sq.tc);
+          const moves=allLegalMoves(gs.board, gs.turn, gs.ep, gs.castle);
+          let match=moves.find(m=>m.fr===sq.fr&&m.fc===sq.fc&&m.tr===sq.tr&&m.tc===sq.tc);
           if (match) {
-            if (sq.promoPiece) match = {...match, promo:true, promoType:sq.promoPiece};
-            doMove({...match, promoType: match.promoType || 'Q'});
+            if (sq.promoPiece) match={...match, promo:true, promoType:sq.promoPiece};
+            doMove({...match, promoType:match.promoType||'Q'});
             return;
           }
         }
       }
-    } catch(e) {
-      console.warn('Stockfish bot move failed:', e);
-    }
+    } catch(e) { console.warn('Stockfish bot failed:', e); }
   }
 
-  // Fallback
-  gs.botThinking = false;
-  const mv = fallbackBotMove(gs.board, gs.turn, gs.ep, gs.castle, gs.elo);
+  gs.botThinking=false;
+  const mv=fallbackBotMove(gs.board, gs.turn, gs.ep, gs.castle, gs.elo);
   if (mv) doMove({...mv, promoType:'Q'});
 }
 
@@ -1187,11 +1509,440 @@ function showPromo(color, cb) {
 }
 
 // ═══════════════════════════════════════════════
+//  GAME REVIEW SYSTEM
+// ═══════════════════════════════════════════════
+let review = {
+  active: false,
+  idx: 0,
+  results: [],     // analysis result per position { bestMove, score, scoreMate }
+  assessments: [], // per move { type, cpLoss, bestMove }
+  evalsWhite: [],  // eval from white's perspective per position
+  complete: false,
+  aborted: false,
+};
+
+// ═══════════════════════════════════════════════
+//  LIVE OPENING DETECTION (sidebar)
+// ═══════════════════════════════════════════════
+let currentOpening = null;
+
+function updateLiveOpening() {
+  const opening = detectOpening(gs.uciMoves);
+  const card = document.getElementById('opening-card');
+  if (opening) {
+    currentOpening = opening;
+    card.style.display = '';
+    document.getElementById('live-opening-name').textContent = opening.name;
+    document.getElementById('live-opening-eco').textContent = 'ECO: ' + opening.eco;
+  }
+  // Keep showing the last detected opening even after moves go beyond the book
+}
+
+// ═══════════════════════════════════════════════
+//  ELO ESTIMATION FROM ACCURACY
+// ═══════════════════════════════════════════════
+function estimateElo(accuracy) {
+  // Maps accuracy % to approximate ELO
+  // Based on lichess/chess.com accuracy-to-rating correlations
+  if (accuracy >= 98) return 2700;
+  if (accuracy >= 95) return 2400;
+  if (accuracy >= 92) return 2200;
+  if (accuracy >= 88) return 2000;
+  if (accuracy >= 83) return 1800;
+  if (accuracy >= 78) return 1600;
+  if (accuracy >= 72) return 1400;
+  if (accuracy >= 65) return 1200;
+  if (accuracy >= 55) return 1000;
+  if (accuracy >= 45) return 800;
+  if (accuracy >= 35) return 600;
+  return 400;
+}
+
+function startReview() {
+  if (!sfAvailable) {
+    alert('Stockfish engine is required for game review but failed to load. Please refresh and ensure you have an internet connection.');
+    return;
+  }
+  if (gs.moveLog.length < 2) return;
+
+  // Pause bot if thinking
+  if (gs.botThinking) {
+    sfEngine.send('stop');
+    gs.botThinking = false;
+  }
+
+  review = {
+    active: true, idx: 0,
+    results: [], assessments: [], evalsWhite: [],
+    complete: false, aborted: false,
+  };
+
+  // Show overlay
+  document.getElementById('review-overlay').style.display = '';
+
+  // Opening detection - use live-detected opening or try to detect from moves
+  const opening = currentOpening || detectOpening(gs.uciMoves);
+  const openCard = document.getElementById('rev-opening-card');
+  if (opening) {
+    openCard.style.display = '';
+    document.getElementById('rev-opening-name').textContent = opening.name;
+    document.getElementById('rev-opening-eco').textContent = 'ECO: ' + opening.eco;
+    document.getElementById('rev-opening-counter').innerHTML = opening.counter;
+  } else {
+    openCard.style.display = 'none';
+  }
+
+  // Reset UI
+  document.getElementById('rev-progress-card').style.display = '';
+  document.getElementById('rev-summary-card').style.display = 'none';
+  document.getElementById('rev-graph-card').style.display = 'none';
+  document.getElementById('rev-detail-card').style.display = 'none';
+  document.getElementById('rev-progress-text').textContent = 'Preparing analysis...';
+  document.getElementById('rev-progress-fill').style.width = '0%';
+  document.getElementById('rev-moves-list').innerHTML = '';
+
+  // Render starting position
+  reviewGoTo(0);
+
+  // Start analysis
+  runReviewAnalysis();
+}
+
+async function runReviewAnalysis() {
+  const positions = gs.fenLog;
+  const N = positions.length;
+  review.results = new Array(N).fill(null);
+
+  for (let i = 0; i < N; i++) {
+    if (review.aborted) return;
+
+    const pct = Math.round((i / N) * 100);
+    document.getElementById('rev-progress-text').textContent = `Analyzing position ${i+1} of ${N}...`;
+    document.getElementById('rev-progress-fill').style.width = pct + '%';
+
+    const result = await sfEngine.analyze(positions[i], 20);
+    review.results[i] = result;
+
+    // Normalize eval to white's perspective
+    const isBlack = positions[i].split(' ')[1] === 'b';
+    review.evalsWhite[i] = result ? (isBlack ? -result.score : result.score) : 0;
+  }
+
+  if (review.aborted) return;
+
+  // Compute assessments for each move
+  review.assessments = [];
+  for (let i = 0; i < gs.moveLog.length; i++) {
+    const r = review.results[i];
+    const rNext = review.results[i + 1];
+    if (!r || !rNext) { review.assessments.push(null); continue; }
+
+    const cpLoss = r.score + rNext.score;
+    const entry = gs.moveLog[i];
+    const boardBefore = fenToBoard(gs.fenLog[i]);
+    const type = classifyMove(cpLoss, entry.uci, r.bestMove, i + 1, boardBefore, entry.mv);
+
+    review.assessments.push({
+      type, cpLoss: Math.max(0, cpLoss), bestMove: r.bestMove,
+    });
+
+    // Store in game history too
+    const histIdx = Math.floor(i / 2);
+    if (histIdx < gs.history.length) {
+      if (entry.color === W) gs.history[histIdx].wAssess = type;
+      else gs.history[histIdx].bAssess = type;
+    }
+  }
+
+  review.complete = true;
+  document.getElementById('rev-progress-text').textContent = 'Analysis complete!';
+  document.getElementById('rev-progress-fill').style.width = '100%';
+
+  // Render everything
+  renderReviewMoveList();
+  renderReviewSummary();
+  renderEvalGraph();
+  reviewGoTo(review.idx);
+  updateHistory(); // update sidebar history with badges
+}
+
+function reviewGoTo(idx) {
+  review.idx = idx;
+  const board = fenToBoard(gs.fenLog[idx]);
+  const lastMv = idx > 0 ? gs.moveLog[idx - 1].mv : null;
+  const assessment = idx > 0 ? review.assessments[idx - 1] : null;
+
+  renderReviewBoard(board, lastMv, assessment);
+  updateReviewEvalBar(idx);
+  updateReviewMoveDetail(idx);
+  updateReviewNavLabel(idx);
+  highlightReviewMove(idx);
+}
+
+function renderReviewBoard(boardArray, lastMv, assessment) {
+  const el = document.getElementById('review-board');
+  el.innerHTML = '';
+  const flip = gs.playerColor === B;
+  const lastSqs = lastMv ? new Set([`${lastMv.fr},${lastMv.fc}`,`${lastMv.tr},${lastMv.tc}`]) : new Set();
+
+  for (let ri=0; ri<8; ri++) for (let ci=0; ci<8; ci++) {
+    const r=flip?7-ri:ri, c=flip?7-ci:ci;
+    const sq=document.createElement('div');
+    const key=`${r},${c}`;
+    sq.className='sq '+((r+c)%2===0?'light':'dark');
+    if (lastSqs.has(key)) sq.classList.add(key===`${lastMv.fr},${lastMv.fc}`?'last-from':'last-to');
+
+    const piece=boardArray[r][c];
+    if (piece) {
+      const pel=document.createElement('div');
+      pel.className=`piece ${piece.color===W?'white':'black'}`;
+      const img=document.createElement('img');
+      img.src=PIECE_IMG[piece.color][piece.type]; img.alt=piece.type;
+      img.onerror=()=>{ pel.textContent=SYMBOLS[piece.color][piece.type]; };
+      pel.appendChild(img); sq.appendChild(pel);
+    }
+
+    // Assessment badge on destination square
+    if (assessment && lastMv && r===lastMv.tr && c===lastMv.tc) {
+      const a = ASSESSMENTS[assessment.type];
+      if (a) {
+        const badge = document.createElement('div');
+        badge.className = 'assess-badge';
+        badge.style.background = a.color;
+        badge.textContent = a.symbol;
+        sq.appendChild(badge);
+      }
+    }
+
+    el.appendChild(sq);
+  }
+}
+
+function updateReviewEvalBar(idx) {
+  const ev = review.evalsWhite[idx] || 0;
+  const sigmoid = 50 + 50 * (2 / (1 + Math.exp(-ev / 300)) - 1);
+  const whitePct = Math.max(2, Math.min(98, sigmoid));
+  document.getElementById('rev-eval-white').style.flex = whitePct.toFixed(1);
+  document.getElementById('rev-eval-black').style.flex = (100 - whitePct).toFixed(1);
+
+  let label;
+  const r = review.results[idx];
+  if (r && r.scoreMate !== null) {
+    label = 'M' + Math.abs(r.scoreMate);
+  } else {
+    label = (ev >= 0 ? '+' : '') + (ev / 100).toFixed(1);
+  }
+  document.getElementById('rev-eval-label').textContent = label;
+}
+
+function updateReviewNavLabel(idx) {
+  if (idx === 0) {
+    document.getElementById('rev-move-label').textContent = 'Start Position';
+  } else {
+    const entry = gs.moveLog[idx - 1];
+    const moveNum = Math.ceil(idx / 2);
+    const side = entry.color === W ? '.' : '...';
+    document.getElementById('rev-move-label').textContent = `Move ${moveNum}${side} ${entry.notation}`;
+  }
+  document.getElementById('rev-first').disabled = idx === 0;
+  document.getElementById('rev-prev').disabled = idx === 0;
+  document.getElementById('rev-next').disabled = idx >= gs.fenLog.length - 1;
+  document.getElementById('rev-last').disabled = idx >= gs.fenLog.length - 1;
+}
+
+function updateReviewMoveDetail(idx) {
+  const card = document.getElementById('rev-detail-card');
+  const content = document.getElementById('rev-detail-content');
+  if (idx === 0 || !review.complete) {
+    card.style.display = 'none';
+    return;
+  }
+  const assessment = review.assessments[idx - 1];
+  if (!assessment) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const a = ASSESSMENTS[assessment.type];
+  const entry = gs.moveLog[idx - 1];
+  const boardBefore = fenToBoard(gs.fenLog[idx - 1]);
+  const bestAlg = uciToAlgebraic(assessment.bestMove, boardBefore);
+  const isBest = entry.uci === assessment.bestMove;
+
+  content.innerHTML = `
+    <div class="rev-detail-badge">
+      <div class="rev-detail-icon" style="background:${a.color}">${a.symbol}</div>
+      <div class="rev-detail-info">
+        <div class="rev-detail-name" style="color:${a.color}">${a.label}</div>
+        <div class="rev-detail-sub">${assessment.cpLoss > 0 ? assessment.cpLoss + ' centipawn loss' : 'No centipawn loss'}</div>
+      </div>
+    </div>
+    ${!isBest ? `<div class="rev-detail-best"><strong>Best move was:</strong> ${bestAlg}</div>` : ''}`;
+}
+
+function highlightReviewMove(idx) {
+  document.querySelectorAll('.rev-move-row').forEach(row => {
+    row.classList.toggle('active', parseInt(row.dataset.posIdx) === idx);
+  });
+  // Scroll active into view
+  const active = document.querySelector('.rev-move-row.active');
+  if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function renderReviewMoveList() {
+  const el = document.getElementById('rev-moves-list');
+  el.innerHTML = '';
+  const pairs = [];
+  for (let i = 0; i < gs.moveLog.length; i += 2) {
+    const w = gs.moveLog[i];
+    const b = gs.moveLog[i + 1] || null;
+    pairs.push({ w, b, wIdx: i, bIdx: i + 1 });
+  }
+
+  pairs.forEach((pair, pairIdx) => {
+    const row = document.createElement('div');
+    row.className = 'rev-move-row';
+
+    const numEl = document.createElement('span');
+    numEl.className = 'num';
+    numEl.textContent = (pairIdx + 1) + '.';
+    row.appendChild(numEl);
+
+    // White move
+    const wEl = document.createElement('span');
+    wEl.className = 'mv';
+    wEl.innerHTML = pair.w.notation + makeBadgeHTML(review.assessments[pair.wIdx]?.type);
+    wEl.dataset.posIdx = pair.wIdx + 1;
+    wEl.style.cursor = 'pointer';
+    wEl.onclick = (e) => { e.stopPropagation(); reviewGoTo(pair.wIdx + 1); };
+    row.appendChild(wEl);
+
+    // Black move
+    const bEl = document.createElement('span');
+    bEl.className = 'mv';
+    if (pair.b) {
+      bEl.innerHTML = pair.b.notation + makeBadgeHTML(review.assessments[pair.bIdx]?.type);
+      bEl.dataset.posIdx = pair.bIdx + 1;
+      bEl.style.cursor = 'pointer';
+      bEl.onclick = (e) => { e.stopPropagation(); reviewGoTo(pair.bIdx + 1); };
+    }
+    row.appendChild(bEl);
+
+    row.dataset.posIdx = pair.wIdx + 1;
+    el.appendChild(row);
+  });
+}
+
+function renderReviewSummary() {
+  document.getElementById('rev-summary-card').style.display = '';
+  const el = document.getElementById('rev-summary');
+
+  const stats = { w: {}, b: {} };
+  const cpLosses = { w: [], b: [] };
+  for (const key of Object.keys(ASSESSMENTS)) { stats.w[key] = 0; stats.b[key] = 0; }
+
+  review.assessments.forEach((a, i) => {
+    if (!a) return;
+    const side = gs.moveLog[i].color === W ? 'w' : 'b';
+    stats[side][a.type] = (stats[side][a.type] || 0) + 1;
+    cpLosses[side].push(a.cpLoss);
+  });
+
+  function accuracy(losses) {
+    if (!losses.length) return 0;
+    const avg = losses.reduce((a, b) => a + b, 0) / losses.length;
+    return Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * avg) - 3.1669));
+  }
+
+  const wAcc = accuracy(cpLosses.w);
+  const bAcc = accuracy(cpLosses.b);
+
+  function catRows(side) {
+    const cats = ['brilliant','great','best','excellent','good','book','inaccuracy','mistake','miss','blunder'];
+    return cats.filter(c => stats[side][c] > 0).map(c => {
+      const a = ASSESSMENTS[c];
+      return `<div class="rev-cat-row">
+        <div class="rev-cat-dot" style="background:${a.color}"></div>
+        <span class="rev-cat-label">${a.label}</span>
+        <span class="rev-cat-count">${stats[side][c]}</span>
+      </div>`;
+    }).join('');
+  }
+
+  const wElo = estimateElo(wAcc);
+  const bElo = estimateElo(bAcc);
+  const wEloLabel = eloToLabel(wElo);
+  const bEloLabel = eloToLabel(bElo);
+
+  el.innerHTML = `
+    <div class="rev-summary-grid">
+      <div class="rev-summary-side">
+        <h4>White ${gs.playerColor === W ? '(You)' : '(Engine)'}</h4>
+        <div class="rev-accuracy" style="color:${wAcc>70?'#81b64c':wAcc>40?'#e6b920':'#ca3431'}">${wAcc.toFixed(1)}%</div>
+        <div class="rev-accuracy-label">Accuracy</div>
+        <div class="rev-elo-estimate">${wElo}</div>
+        <div class="rev-elo-label">Est. ELO (${wEloLabel})</div>
+        <div class="rev-cat-list">${catRows('w')}</div>
+      </div>
+      <div class="rev-summary-side">
+        <h4>Black ${gs.playerColor === B ? '(You)' : '(Engine)'}</h4>
+        <div class="rev-accuracy" style="color:${bAcc>70?'#81b64c':bAcc>40?'#e6b920':'#ca3431'}">${bAcc.toFixed(1)}%</div>
+        <div class="rev-accuracy-label">Accuracy</div>
+        <div class="rev-elo-estimate">${bElo}</div>
+        <div class="rev-elo-label">Est. ELO (${bEloLabel})</div>
+        <div class="rev-cat-list">${catRows('b')}</div>
+      </div>
+    </div>`;
+}
+
+function renderEvalGraph() {
+  document.getElementById('rev-graph-card').style.display = '';
+  const svg = document.getElementById('rev-eval-graph');
+  const w = svg.clientWidth || 280;
+  const h = svg.clientHeight || 80;
+  const evals = review.evalsWhite;
+  if (evals.length < 2) return;
+
+  const points = evals.map((ev, i) => {
+    const x = (i / (evals.length - 1)) * w;
+    const sigmoid = 50 + 50 * (2 / (1 + Math.exp(-ev / 300)) - 1);
+    const y = h - (sigmoid / 100) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  // Create fill polygon (area under curve from white's perspective)
+  const fillPoints = [`0,${h}`, ...points, `${w},${h}`].join(' ');
+
+  svg.innerHTML = `
+    <rect x="0" y="0" width="${w}" height="${h}" fill="#0f1a2e"/>
+    <line x1="0" y1="${h/2}" x2="${w}" y2="${h/2}" stroke="#1a3a5c" stroke-width="1" stroke-dasharray="4,4"/>
+    <polygon points="${fillPoints}" fill="rgba(78,204,163,0.15)"/>
+    <polyline points="${points.join(' ')}" fill="none" stroke="#4ecca3" stroke-width="2"/>`;
+}
+
+function closeReview() {
+  review.active = false;
+  review.aborted = true;
+  document.getElementById('review-overlay').style.display = 'none';
+  if (sfEngine) sfEngine.send('stop');
+
+  // Resume bot if game is in progress and it's bot's turn
+  if (!gs.gameOver && gs.turn !== gs.playerColor && !gs.botThinking) {
+    gs.botThinking = true;
+    setTimeout(() => runBot(), 300);
+  }
+}
+
+// ═══════════════════════════════════════════════
 //  UI HELPERS
 // ═══════════════════════════════════════════════
 function setStatus(txt, cls='') {
   const el=document.getElementById('status');
   el.textContent=txt; el.className=cls;
+}
+
+function showReviewBtn() {
+  const btn = document.getElementById('btn-review');
+  btn.style.display = '';
+  btn.textContent = 'Review Game';
 }
 
 function updateHistory() {
@@ -1200,10 +1951,8 @@ function updateHistory() {
   gs.history.forEach((pair,i)=>{
     const d=document.createElement('div');
     d.className='move-row';
-
-    const wBadge = pair.wAssess ? makeBadgeHTML(pair.wAssess) : '';
-    const bBadge = pair.bAssess ? makeBadgeHTML(pair.bAssess) : '';
-
+    const wBadge=pair.wAssess?makeBadgeHTML(pair.wAssess):'';
+    const bBadge=pair.bAssess?makeBadgeHTML(pair.bAssess):'';
     d.innerHTML=`<span class="num">${i+1}.</span><span class="mv">${pair.w}${wBadge}</span><span class="mv">${pair.b}${bBadge}</span>`;
     el.appendChild(d);
   });
@@ -1211,35 +1960,43 @@ function updateHistory() {
 }
 
 function makeBadgeHTML(type) {
-  const a = ASSESSMENTS[type];
-  if (!a) return '';
+  if (!type) return '';
+  const a=ASSESSMENTS[type]; if (!a) return '';
   return ` <span class="mini-badge" style="background:${a.color}" title="${a.label}">${a.symbol}</span>`;
 }
 
 function newGame() {
-  // Stop any ongoing Stockfish analysis
-  if (sfPlay) sfPlay.send('stop');
-  if (sfAnalysis) sfAnalysis.send('stop');
+  if (sfEngine) sfEngine.send('stop');
+  if (review.active) closeReview();
 
   gs.board=initBoard();
   gs.turn=W; gs.sel=null; gs.hints=[];
   gs.gameOver=false; gs.ep=null;
   gs.castle={wK:true,wQ:true,bK:true,bQ:true};
   gs.lastMv=null; gs.history=[]; gs.checking=false;
-  gs.moveNumber=1; gs.halfmove=0;
-  gs.lastAssessment=null; gs.assessmentPending=false;
-  gs.botThinking=false;
+  gs.moveNumber=1; gs.halfmove=0; gs.botThinking=false;
+
+  // Reset recording
+  gs.fenLog=[boardToFEN(gs.board, W, gs.castle, gs.ep, 0, 1)];
+  gs.moveLog=[]; gs.uciMoves=[];
+
+  // Hide review button and opening card
+  document.getElementById('btn-review').style.display='none';
+  document.getElementById('opening-card').style.display='none';
+  currentOpening = null;
 
   buildLabels();
   setStatus(gs.playerColor===W?'Your turn':'Bot is thinking...');
-  renderAssessment();
   updateHistory();
   renderBoard();
   if (gs.playerColor===B) setTimeout(()=>runBot(), 300);
 }
 
-// ─── Event wiring ──────────────────────────
+// ═══════════════════════════════════════════════
+//  EVENT WIRING
+// ═══════════════════════════════════════════════
 document.getElementById('btn-new').addEventListener('click', newGame);
+document.getElementById('btn-review').addEventListener('click', startReview);
 
 // Color buttons
 document.querySelectorAll('.col-btn').forEach(btn=>{
@@ -1252,41 +2009,48 @@ document.querySelectorAll('.col-btn').forEach(btn=>{
 });
 
 // ELO slider
-const eloSlider = document.getElementById('elo-slider');
-const eloValueEl = document.getElementById('elo-value');
-const eloLabelEl = document.getElementById('elo-label');
+const eloSlider=document.getElementById('elo-slider');
+const eloValueEl=document.getElementById('elo-value');
+const eloLabelEl=document.getElementById('elo-label');
 
 function updateEloDisplay() {
-  const elo = parseInt(eloSlider.value);
-  gs.elo = elo;
-  eloValueEl.textContent = elo;
-  eloLabelEl.textContent = eloToLabel(elo);
-
-  // Update preset button highlights
-  document.querySelectorAll('.preset-btn').forEach(b => {
-    const bElo = parseInt(b.dataset.elo);
-    b.classList.toggle('active', Math.abs(bElo - elo) < 100);
+  const elo=parseInt(eloSlider.value);
+  gs.elo=elo;
+  eloValueEl.textContent=elo;
+  eloLabelEl.textContent=eloToLabel(elo);
+  document.querySelectorAll('.preset-btn').forEach(b=>{
+    b.classList.toggle('active', Math.abs(parseInt(b.dataset.elo)-elo)<100);
   });
 }
-
 eloSlider.addEventListener('input', updateEloDisplay);
 
-// ELO presets
 document.querySelectorAll('.preset-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    eloSlider.value = btn.dataset.elo;
+    eloSlider.value=btn.dataset.elo;
     updateEloDisplay();
   });
 });
 
-// ─── Boot ──────────────────────────────────
+// Review navigation
+document.getElementById('rev-close').addEventListener('click', closeReview);
+document.getElementById('rev-first').addEventListener('click', ()=>reviewGoTo(0));
+document.getElementById('rev-prev').addEventListener('click', ()=>{ if(review.idx>0) reviewGoTo(review.idx-1); });
+document.getElementById('rev-next').addEventListener('click', ()=>{ if(review.idx<gs.fenLog.length-1) reviewGoTo(review.idx+1); });
+document.getElementById('rev-last').addEventListener('click', ()=>reviewGoTo(gs.fenLog.length-1));
+
+document.addEventListener('keydown', (e)=>{
+  if (!review.active) return;
+  if (e.key==='ArrowLeft') { e.preventDefault(); if(review.idx>0) reviewGoTo(review.idx-1); }
+  else if (e.key==='ArrowRight') { e.preventDefault(); if(review.idx<gs.fenLog.length-1) reviewGoTo(review.idx+1); }
+  else if (e.key==='Escape') { e.preventDefault(); closeReview(); }
+});
+
+// ── Boot ──
 updateEloDisplay();
 newGame();
-initStockfish().then(() => {
-  // If player is black, bot might need to move now with Stockfish
-  if (gs.playerColor === B && gs.history.length === 0 && !gs.botThinking) {
-    gs.botThinking = true;
-    runBot();
+initStockfish().then(()=>{
+  if (gs.playerColor===B && gs.history.length===0 && !gs.botThinking) {
+    gs.botThinking=true; runBot();
   }
 });
 </script>
