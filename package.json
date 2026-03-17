@@ -1,0 +1,16 @@
+{
+  "name": "chess-online",
+  "version": "1.0.0",
+  "description": "Chess game with online multiplayer, friends, and bot play",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.0",
+    "socket.io": "^4.8.0",
+    "uuid": "^10.0.0"
+  }
+}
