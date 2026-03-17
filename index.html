@@ -274,6 +274,16 @@
 
     /* ── Buttons ── */
     .game-buttons { display: flex; gap: 8px; }
+    #btn-undo {
+      flex: 0.6; background: #0f3460;
+      border: 2px solid #b0b0b0; color: #b0b0b0;
+      padding: 11px; border-radius: 7px;
+      cursor: pointer; font-size: 14px; font-weight: bold;
+      letter-spacing: 0.5px; transition: background 0.15s;
+    }
+    #btn-undo:hover:not(:disabled) { background: #2a2a3a; }
+    #btn-undo:disabled { opacity: 0.4; cursor: default; }
+
     #btn-new {
       flex: 1; background: #0f3460;
       border: 2px solid #4ecca3; color: #4ecca3;
@@ -779,6 +789,7 @@
   </div>
 
   <div class="game-buttons">
+    <button id="btn-undo" disabled>↩ Undo</button>
     <button id="btn-new">New Game</button>
     <button id="btn-review">Review Game</button>
   </div>
@@ -1444,24 +1455,36 @@ class StockfishEngine {
 
   async analyze(fen, depth=12) {
     if (!this.ready) return null;
+    // Drain any pending bestmove from a previous stop
+    await new Promise((resolve) => {
+      this.send('isready');
+      const rdy = (line) => {
+        if (typeof line === 'string' && line.includes('readyok')) {
+          this.offMessage(rdy);
+          resolve();
+        }
+      };
+      this.onMessage(rdy);
+    });
     return new Promise((resolve) => {
       let bestMove=null, score=0, scoreMate=null;
+      let gotInfo = false;
       const handler = (line) => {
         if (typeof line!=='string') return;
         const m=line.match(/^info depth (\d+).*?score (cp|mate) (-?\d+)/);
         if (m) {
+          gotInfo = true;
           const val=parseInt(m[3]);
           if (m[2]==='mate') { scoreMate=val; score=val>0?100000-Math.abs(val)*100:-100000+Math.abs(val)*100; }
           else { scoreMate=null; score=val; }
         }
-        if (line.startsWith('bestmove')) {
+        if (line.startsWith('bestmove') && gotInfo) {
           bestMove=line.split(/\s+/)[1];
           this.offMessage(handler);
           resolve({ bestMove, score, scoreMate });
         }
       };
       this.onMessage(handler);
-      this.send('stop');
       this.send('position fen '+fen);
       this.send('go depth '+depth);
     });
@@ -1682,6 +1705,9 @@ let gs = {
   uciMoves: [],
 };
 
+// Undo stack: snapshots of game state before each move
+let undoStack = [];
+
 // ═══════════════════════════════════════════════
 //  CHESS TIMER
 // ═══════════════════════════════════════════════
@@ -1847,6 +1873,24 @@ function handleClick(r,c) {
 }
 
 function doMove(mv) {
+  // Save snapshot for undo
+  undoStack.push({
+    board: gs.board.map(r=>r.map(p=>p?{...p}:null)),
+    turn: gs.turn,
+    ep: gs.ep ? [...gs.ep] : null,
+    castle: {...gs.castle},
+    lastMv: gs.lastMv ? {...gs.lastMv} : null,
+    history: gs.history.map(h=>({...h})),
+    checking: gs.checking,
+    moveNumber: gs.moveNumber,
+    halfmove: gs.halfmove,
+    gameOver: gs.gameOver,
+    fenLog: [...gs.fenLog],
+    moveLog: gs.moveLog.map(m=>({...m})),
+    uciMoves: [...gs.uciMoves],
+  });
+  updateUndoBtn();
+
   const {board, turn, ep, castle} = gs;
   const promoType = mv.promoType||'Q';
   const fenBefore = boardToFEN(board, turn, castle, ep, gs.halfmove, gs.moveNumber);
@@ -1921,6 +1965,65 @@ function doMove(mv) {
     gs.botThinking=true;
     setTimeout(()=>runBot(), 150);
   }
+}
+
+function undoMove() {
+  if (gs.botThinking || undoStack.length === 0) return;
+  if (sfEngine) sfEngine.send('stop');
+
+  // In bot mode, undo both bot's move and player's move (so player gets their turn back)
+  if (gs.gameMode === 'bot' && undoStack.length >= 2 && gs.turn === gs.playerColor) {
+    // Undo bot's last move + player's last move
+    undoStack.pop(); // bot move
+    const snap = undoStack.pop(); // player move
+    restoreSnapshot(snap);
+  } else {
+    const snap = undoStack.pop();
+    restoreSnapshot(snap);
+  }
+}
+
+function restoreSnapshot(snap) {
+  gs.board = snap.board;
+  gs.turn = snap.turn;
+  gs.ep = snap.ep;
+  gs.castle = snap.castle;
+  gs.lastMv = snap.lastMv;
+  gs.history = snap.history;
+  gs.checking = snap.checking;
+  gs.moveNumber = snap.moveNumber;
+  gs.halfmove = snap.halfmove;
+  gs.gameOver = snap.gameOver;
+  gs.fenLog = snap.fenLog;
+  gs.moveLog = snap.moveLog;
+  gs.uciMoves = snap.uciMoves;
+  gs.sel = null;
+  gs.hints = [];
+
+  // Sync Stockfish position
+  if (sfEngine && gs.uciMoves.length > 0) {
+    sfEngine.send('position startpos moves ' + gs.uciMoves.join(' '));
+  } else if (sfEngine) {
+    sfEngine.send('position startpos');
+  }
+
+  // Update status
+  if (gs.gameMode === 'pvp') {
+    setStatus(`${gs.turn===W?'White':'Black'}'s turn`);
+  } else {
+    setStatus(gs.turn===gs.playerColor?'Your turn':'Bot is thinking...');
+  }
+
+  document.getElementById('btn-review').style.display='none';
+  updateLiveOpening();
+  updateHistory();
+  updateUndoBtn();
+  renderBoard();
+}
+
+function updateUndoBtn() {
+  const btn = document.getElementById('btn-undo');
+  if (btn) btn.disabled = undoStack.length === 0;
 }
 
 async function runBot() {
@@ -2223,18 +2326,41 @@ async function runReviewAnalysis() {
   const positions = gs.fenLog;
   const N = positions.length;
   review.results = new Array(N).fill(null);
+  const ANALYSIS_DEPTH = 14;
 
+  // Use parallel analysis pool for speed
+  if (!analysisPool) {
+    analysisPool = new AnalysisPool(3);
+    await analysisPool.init();
+  }
+
+  if (analysisPool.engines.length > 0) {
+    review.results = await analysisPool.analyzeAll(
+      positions, ANALYSIS_DEPTH,
+      (completed, total) => {
+        if (review.aborted) return;
+        const pct = Math.round((completed / total) * 100);
+        document.getElementById('rev-progress-text').textContent = `Analyzing position ${completed} of ${total}...`;
+        document.getElementById('rev-progress-fill').style.width = pct + '%';
+      },
+      () => review.aborted
+    );
+  } else {
+    // Fallback to single engine
+    for (let i = 0; i < N; i++) {
+      if (review.aborted) return;
+      const pct = Math.round((i / N) * 100);
+      document.getElementById('rev-progress-text').textContent = `Analyzing position ${i+1} of ${N}...`;
+      document.getElementById('rev-progress-fill').style.width = pct + '%';
+      review.results[i] = await sfEngine.analyze(positions[i], ANALYSIS_DEPTH);
+    }
+  }
+
+  if (review.aborted) return;
+
+  // Normalize evals to white's perspective
   for (let i = 0; i < N; i++) {
-    if (review.aborted) return;
-
-    const pct = Math.round((i / N) * 100);
-    document.getElementById('rev-progress-text').textContent = `Analyzing position ${i+1} of ${N}...`;
-    document.getElementById('rev-progress-fill').style.width = pct + '%';
-
-    const result = await sfEngine.analyze(positions[i], 20);
-    review.results[i] = result;
-
-    // Normalize eval to white's perspective
+    const result = review.results[i];
     const isBlack = positions[i].split(' ')[1] === 'b';
     review.evalsWhite[i] = result ? (isBlack ? -result.score : result.score) : 0;
   }
@@ -2760,6 +2886,7 @@ function closeReview() {
   review.aborted = true;
   document.getElementById('review-overlay').style.display = 'none';
   if (sfEngine) sfEngine.send('stop');
+  if (analysisPool) { analysisPool.destroy(); analysisPool = null; }
 
   // Resume bot if game is in progress and it's bot's turn (bot mode only)
   if (gs.gameMode === 'bot' && !gs.gameOver && gs.turn !== gs.playerColor && !gs.botThinking) {
@@ -2818,6 +2945,10 @@ function newGame() {
   gs.fenLog=[boardToFEN(gs.board, W, gs.castle, gs.ep, 0, 1)];
   gs.moveLog=[]; gs.uciMoves=[];
 
+  // Reset undo stack
+  undoStack = [];
+  updateUndoBtn();
+
   // Hide review button and opening card
   document.getElementById('btn-review').style.display='none';
   document.getElementById('opening-card').style.display='none';
@@ -2855,6 +2986,7 @@ function updateModeUI() {
 // ═══════════════════════════════════════════════
 //  EVENT WIRING
 // ═══════════════════════════════════════════════
+document.getElementById('btn-undo').addEventListener('click', undoMove);
 document.getElementById('btn-new').addEventListener('click', newGame);
 document.getElementById('btn-review').addEventListener('click', startReview);
 
