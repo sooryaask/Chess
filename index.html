@@ -694,6 +694,32 @@
       font-size: 13px; font-weight: 800; color: #e6b920;
     }
 
+    /* ── Sound toggle button ── */
+    .sound-toggle-btn {
+      background: none; border: 1px solid #1a3a5c; color: #7a8899;
+      width: 30px; height: 20px; border-radius: 4px;
+      cursor: pointer; font-size: 12px; transition: all 0.15s;
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0; vertical-align: middle; margin-left: 6px;
+    }
+    .sound-toggle-btn:hover { border-color: #4ecca3; color: #ccc; }
+    .sound-toggle-btn.muted { color: #ca3431; border-color: #553333; }
+
+    /* ── PGN copy button in history header ── */
+    .card-header-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .card-header-row h3 { margin-bottom: 0; }
+    .pgn-btn {
+      background: none; border: 1px solid #1a3a5c; color: #556677;
+      padding: 2px 8px; border-radius: 4px; cursor: pointer;
+      font-size: 10px; letter-spacing: 0.5px; transition: all 0.15s;
+      text-transform: uppercase; font-family: inherit;
+    }
+    .pgn-btn:hover { border-color: #4ecca3; color: #4ecca3; }
+    .pgn-btn.copied { border-color: #81b64c; color: #81b64c; }
+
   </style>
 </head>
 <body>
@@ -714,6 +740,7 @@
     <div class="engine-badge" id="engine-badge-wrap">
       <div class="dot loading" id="engine-dot"></div>
       <span id="engine-label">Loading Stockfish...</span>
+      <button id="btn-sound" class="sound-toggle-btn" title="Toggle sound">🔊</button>
     </div>
   </div>
 
@@ -795,7 +822,10 @@
   </div>
 
   <div class="card">
-    <h3>Move History</h3>
+    <div class="card-header-row">
+      <h3>Move History</h3>
+      <button id="btn-pgn" class="pgn-btn">Copy PGN</button>
+    </div>
     <div class="history-scroll" id="history"></div>
   </div>
 
@@ -1925,6 +1955,13 @@ function doMove(mv) {
   gs.uciMoves.push(playerMoveUCI);
   gs.fenLog.push(fenAfter);
 
+  // Sound feedback
+  if (isCheckmate)      { playSound('checkmate'); launchConfetti(); }
+  else if (isStalemate) { playSound('draw'); }
+  else if (oppCheck)    { playSound('check'); }
+  else if (mv.cap || mv.ep) { playSound('capture'); }
+  else                  { playSound('move'); }
+
   if (isCheckmate) {
     gs.gameOver=true;
     setStatus(`Checkmate! ${turn===W?'White':'Black'} wins!`,'game-over');
@@ -2932,6 +2969,7 @@ function makeBadgeHTML(type) {
 function newGame() {
   if (sfEngine) sfEngine.send('stop');
   if (review.active) closeReview();
+  playSound('gamestart');
   stopTimer();
 
   gs.board=initBoard();
@@ -2989,6 +3027,8 @@ function updateModeUI() {
 document.getElementById('btn-undo').addEventListener('click', undoMove);
 document.getElementById('btn-new').addEventListener('click', newGame);
 document.getElementById('btn-review').addEventListener('click', startReview);
+document.getElementById('btn-sound').addEventListener('click', toggleSound);
+document.getElementById('btn-pgn').addEventListener('click', copyPGN);
 
 // Game mode buttons
 document.querySelectorAll('.mode-btn').forEach(btn=>{
@@ -3069,6 +3109,197 @@ document.addEventListener('keydown', (e)=>{
   else if (e.key==='ArrowRight') { e.preventDefault(); if(review.idx<gs.fenLog.length-1) reviewGoTo(review.idx+1); }
   else if (e.key==='Escape') { e.preventDefault(); closeReview(); }
 });
+
+// ═══════════════════════════════════════════════
+//  SOUND SYSTEM (Web Audio API — no CDN needed)
+// ═══════════════════════════════════════════════
+let _audioCtx = null;
+let soundEnabled = true;
+
+function _getAudioCtx() {
+  if (!_audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) _audioCtx = new Ctx();
+  }
+  return _audioCtx;
+}
+
+function playSound(type) {
+  if (!soundEnabled) return;
+  try {
+    const ctx = _getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+
+    if (type === 'move') {
+      // Soft woody thud — white noise burst shaped like a tap
+      const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.08), ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/d.length, 9) * 0.7;
+      const src = ctx.createBufferSource();
+      const filt = ctx.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 2800;
+      const gain = ctx.createGain(); gain.gain.value = 0.45;
+      src.buffer = buf; src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+      src.start(now);
+    } else if (type === 'capture') {
+      // Heavier thud
+      const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.13), ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/d.length, 5) * 0.9;
+      const src = ctx.createBufferSource();
+      const gain = ctx.createGain(); gain.gain.value = 0.6;
+      src.buffer = buf; src.connect(gain); gain.connect(ctx.destination);
+      src.start(now);
+    } else if (type === 'check') {
+      // Two sharp pings
+      [880, 1100].forEach((freq, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'square'; osc.frequency.value = freq;
+        const t = now + i * 0.14;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.08, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+        osc.start(t); osc.stop(t + 0.13);
+      });
+    } else if (type === 'checkmate') {
+      // Triumphant ascending chord
+      [523, 659, 784, 1047].forEach((freq, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine'; osc.frequency.value = freq;
+        const t = now + i * 0.18;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.18, t + 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+        osc.start(t); osc.stop(t + 0.55);
+      });
+    } else if (type === 'draw') {
+      // Descending neutral tone
+      [523, 392].forEach((freq, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine'; osc.frequency.value = freq;
+        const t = now + i * 0.22;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.1, t + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+        osc.start(t); osc.stop(t + 0.42);
+      });
+    } else if (type === 'gamestart') {
+      // Quick upward ding
+      [523, 784].forEach((freq, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine'; osc.frequency.value = freq;
+        const t = now + i * 0.13;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.12, t + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+        osc.start(t); osc.stop(t + 0.28);
+      });
+    }
+  } catch(e) { /* Audio API not available */ }
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  const btn = document.getElementById('btn-sound');
+  if (btn) { btn.textContent = soundEnabled ? '🔊' : '🔇'; btn.classList.toggle('muted', !soundEnabled); }
+}
+
+// ═══════════════════════════════════════════════
+//  CONFETTI CELEBRATION
+// ═══════════════════════════════════════════════
+function launchConfetti() {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999';
+  document.body.appendChild(canvas);
+  const ctx2 = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const COLORS = ['#4ecca3','#e6b920','#ca3431','#5b8bb4','#81b64c','#ffffff','#e0a0ff'];
+  const pieces = Array.from({length: 140}, () => ({
+    x: Math.random() * canvas.width,
+    y: -15 - Math.random() * 100,
+    vx: (Math.random() - 0.5) * 5,
+    vy: 2.5 + Math.random() * 3,
+    size: 5 + Math.random() * 8,
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    rotation: Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 0.25,
+    shape: Math.random() > 0.4 ? 'rect' : 'circle',
+  }));
+  let frame = 0;
+  function animate() {
+    ctx2.clearRect(0, 0, canvas.width, canvas.height);
+    for (const p of pieces) {
+      p.x += p.vx + Math.sin(frame * 0.04 + p.rotation) * 0.4;
+      p.y += p.vy; p.vy += 0.06; p.rotation += p.rotSpeed;
+      ctx2.save();
+      ctx2.globalAlpha = Math.max(0, 1 - p.y / canvas.height * 1.2);
+      ctx2.translate(p.x, p.y); ctx2.rotate(p.rotation); ctx2.fillStyle = p.color;
+      if (p.shape === 'rect') ctx2.fillRect(-p.size/2, -p.size/4, p.size, p.size/2);
+      else { ctx2.beginPath(); ctx2.arc(0, 0, p.size/2, 0, Math.PI*2); ctx2.fill(); }
+      ctx2.restore();
+    }
+    frame++;
+    if (frame < 230) requestAnimationFrame(animate); else canvas.remove();
+  }
+  requestAnimationFrame(animate);
+}
+
+// ═══════════════════════════════════════════════
+//  PGN EXPORT
+// ═══════════════════════════════════════════════
+function generatePGN() {
+  const today = new Date().toISOString().slice(0,10).replace(/-/g,'.');
+  const lines = ['[Event "Chess Arena"]','[Site "Chess Arena"]',`[Date "${today}"]`,'[Round "-"]'];
+  if (gs.gameMode === 'bot') {
+    lines.push(gs.playerColor === W ? '[White "Player"]' : `[White "Bot (${gs.elo})"]`);
+    lines.push(gs.playerColor === W ? `[Black "Bot (${gs.elo})"]` : '[Black "Player"]');
+  } else { lines.push('[White "White"]'); lines.push('[Black "Black"]'); }
+  const statusText = document.getElementById('status').textContent;
+  let result = '*';
+  if (gs.gameOver) {
+    if (statusText.includes('White wins')) result = '1-0';
+    else if (statusText.includes('Black wins')) result = '0-1';
+    else result = '1/2-1/2';
+  }
+  lines.push(`[Result "${result}"]`,'');
+  const parts = [];
+  gs.history.forEach((pair,i) => {
+    parts.push(`${i+1}.`);
+    if (pair.w) parts.push(pair.w);
+    if (pair.b) parts.push(pair.b);
+  });
+  parts.push(result);
+  let line = '', wrapped = [];
+  for (const w of parts) {
+    if (line && line.length + 1 + w.length > 80) { wrapped.push(line); line = w; }
+    else line = line ? line + ' ' + w : w;
+  }
+  if (line) wrapped.push(line);
+  lines.push(wrapped.join('\n'));
+  return lines.join('\n');
+}
+
+function copyPGN() {
+  const pgn = generatePGN();
+  const btn = document.getElementById('btn-pgn');
+  const reset = () => { btn.textContent = 'Copy PGN'; btn.classList.remove('copied'); };
+  (navigator.clipboard?.writeText(pgn) ?? Promise.reject()).then(() => {
+    btn.textContent = '✓ Copied!'; btn.classList.add('copied'); setTimeout(reset, 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = pgn; ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    btn.textContent = '✓ Copied!'; btn.classList.add('copied'); setTimeout(reset, 2000);
+  });
+}
 
 // ── Boot ──
 updateEloDisplay();
